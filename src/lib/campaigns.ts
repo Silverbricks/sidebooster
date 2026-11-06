@@ -40,8 +40,8 @@ export function isSalesOpen(c: Campaign, now = new Date()) {
 export type EligibilityUser = Pick<User, "id" | "role" | "accountStatus" | "dateOfBirth" | "state" | "idVerifiedAt">;
 
 /** States where paid entry is blocked (e.g. VIC/NSW trade promotions must be free to enter). */
-export async function blockedPaidStates() {
-  return getList("paid_entry_blocked_states");
+export async function blockedPaidStates(client: Tx = db) {
+  return getList("paid_entry_blocked_states", client);
 }
 
 /** Campaign-level compliance checks run at submission and approval. */
@@ -70,9 +70,9 @@ export async function campaignComplianceProblems(
 export async function eligibilityProblems(c: Campaign, user: EligibilityUser, quantity: number, tx: Tx = db) {
   const problems: string[] = [];
   if (!isSalesOpen(c)) problems.push("Ticket sales are not open for this campaign.");
-  if (c.ticketType === "PAID" && !(await getBool("paid_draws_enabled")))
+  if (c.ticketType === "PAID" && !(await getBool("paid_draws_enabled", tx)))
     problems.push("Paid draws are not currently enabled on this platform.");
-  if (c.ticketType === "FREE" && !(await getBool("free_draws_enabled")))
+  if (c.ticketType === "FREE" && !(await getBool("free_draws_enabled", tx)))
     problems.push("Free draws are not currently enabled on this platform.");
   if (user.id === c.sellerId) problems.push("You cannot enter your own campaign.");
   if (user.role === "ADMIN") problems.push("Administrators cannot enter draws.");
@@ -82,7 +82,7 @@ export async function eligibilityProblems(c: Campaign, user: EligibilityUser, qu
   const allowed = (c.allowedStates ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   if (!user.state) problems.push("Add your state/territory to your profile.");
   else if (allowed.length && !allowed.includes(user.state)) problems.push(`This campaign is only open to residents of ${allowed.join(", ")}.`);
-  else if (c.ticketType === "PAID" && (await blockedPaidStates()).includes(user.state)) problems.push(`Paid entry is not available to residents of ${user.state}.`);
+  else if (c.ticketType === "PAID" && (await blockedPaidStates(tx)).includes(user.state)) problems.push(`Paid entry is not available to residents of ${user.state}.`);
   if (c.requireIdVerification && !user.idVerifiedAt) problems.push("This campaign requires identity verification.");
 
   if (!Number.isInteger(quantity) || quantity < 1) problems.push("Choose at least one ticket.");
@@ -249,7 +249,7 @@ export async function runDraw(campaignId: string, adminId: string) {
     if (c.status !== "SALES_CLOSED" || !c.lockedAt || !c.drawSeed || !c.eligibleHash || !c.seedCommitment)
       throw new Error("Sales must be closed and locked before drawing.");
     if (!c.scheduleApproved) throw new Error("The draw schedule has not been approved.");
-    const soldOutEarly = c.drawMode === "SOLD_OUT" && !!c.soldOutAt && (await getBool("rule_sold_out_trigger_allowed"));
+    const soldOutEarly = c.drawMode === "SOLD_OUT" && !!c.soldOutAt && (await getBool("rule_sold_out_trigger_allowed", tx));
     if (new Date() < c.drawAt && !soldOutEarly) throw new Error("The scheduled draw time has not been reached.");
     if (await tx.drawResult.findUnique({ where: { campaignId } })) throw new Error("This campaign has already been drawn.");
 

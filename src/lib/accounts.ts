@@ -18,7 +18,7 @@ const LOCKED_STATUSES = ["SUSPENDED", "CLOSED", "RESTRICTED", "VERIFICATION_REQU
 export async function refreshAccountStatus(userId: string, tx: Tx = db) {
   const u = await tx.user.findUniqueOrThrow({ where: { id: userId } });
   if (LOCKED_STATUSES.includes(u.accountStatus)) return u.accountStatus;
-  const needMobile = await getBool("rule_buyer_require_mobile");
+  const needMobile = await getBool("rule_buyer_require_mobile", tx);
   let status = "ACTIVE";
   if (!u.emailVerifiedAt) status = "EMAIL_PENDING";
   else if (needMobile && !u.mobileVerifiedAt) status = "MOBILE_PENDING";
@@ -73,7 +73,7 @@ export async function verifyMobileOtp(userId: string, code: string) {
 export async function refreshSellerStatus(sellerProfileId: string, tx: Tx = db) {
   const s = await tx.sellerProfile.findUniqueOrThrow({ where: { id: sellerProfileId }, include: { paymentAccount: true } });
   if (!["APPROVED", "ACTIVE"].includes(s.status)) return s.status;
-  const needPayout = await getBool("rule_seller_require_payout_account");
+  const needPayout = await getBool("rule_seller_require_payout_account", tx);
   const payoutOk = !!s.paymentAccount?.payoutsEnabled && !s.paymentAccount.restricted;
   const status = !needPayout || payoutOk ? "ACTIVE" : "APPROVED";
   if (status !== s.status) await tx.sellerProfile.update({ where: { id: s.id }, data: { status } });

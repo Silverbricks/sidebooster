@@ -32,7 +32,7 @@ export async function resolveRate(tx: Tx, categoryId: string, sellerId: string, 
     const r = await tx.commissionRule.findFirst({ where: { categoryId: cid, sellerId: null, ...active }, orderBy: { effectiveFrom: "desc" } });
     if (r) return { rateBps: r.rateBps, ruleId: r.id };
   }
-  return { rateBps: await getNumber("default_commission_bps"), ruleId: null };
+  return { rateBps: await getNumber("default_commission_bps", tx), ruleId: null };
 }
 
 export const commissionOf = (amount: number, bps: number) => Math.round((amount * bps) / 10_000);
@@ -187,7 +187,7 @@ async function generateCommission(tx: Tx, commissionId: string, actorId: string 
   await audit(actorId, "COMMISSION_GENERATED", "Commission", rec.id, { amount: rec.amount }, tx);
   if (rec.settlement === "INVOICE") {
     if (rec.amount === 0) return;
-    const days = await getNumber("commission_invoice_due_days");
+    const days = await getNumber("commission_invoice_due_days", tx);
     const inv = await tx.commissionInvoice.create({
       data: { invoiceNumber: code("INV"), sellerId: rec.sellerId, commissionId: rec.id, amount: rec.amount, dueDate: new Date(Date.now() + days * 86400_000) },
     });

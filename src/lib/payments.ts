@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import { db } from "./db";
+import { db, type Tx } from "./db";
 import { notify } from "./notify";
 import { audit } from "./audit";
 import { money } from "./format";
@@ -23,8 +23,8 @@ export class CheckoutError extends Error {}
 const receipt = (p: "P" | "T") => `${p}${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 const orderNumber = () => `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 
-async function expiry() {
-  return new Date(Date.now() + (await getNumber("payment_expiry_minutes")) * 60_000);
+async function expiry(client: Tx = db) {
+  return new Date(Date.now() + (await getNumber("payment_expiry_minutes", client)) * 60_000);
 }
 
 // ---------------------------------------------------------------- product checkout
@@ -78,7 +78,7 @@ export async function startProductCheckout(
         provider: paymentProvider().name,
         idempotencyKey: input.idempotencyKey,
         orderId: order.id,
-        expiresAt: await expiry(),
+        expiresAt: await expiry(tx),
       },
     });
   });
@@ -123,7 +123,7 @@ export async function startTicketCheckout(buyer: CurrentUser, input: { campaignI
         provider: paymentProvider().name,
         idempotencyKey: input.idempotencyKey,
         ticketPurchaseId: tp.id,
-        expiresAt: await expiry(),
+        expiresAt: await expiry(tx),
       },
     });
   });

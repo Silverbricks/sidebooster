@@ -1,5 +1,5 @@
 import { brand } from "@/config/brand";
-import { db } from "./db";
+import { db, type Tx } from "./db";
 
 /**
  * Platform settings + the central Approval Engine rules. Everything here is editable by the
@@ -55,19 +55,23 @@ export async function getSettings(): Promise<Record<SettingKey, string>> {
   return out;
 }
 
-export async function getSetting(key: SettingKey) {
-  const row = await db.setting.findUnique({ where: { key } });
+/**
+ * Pass the transaction client when calling from inside db.$transaction: using the global `db` there
+ * needs a second pooled connection and can deadlock the pool under concurrent load.
+ */
+export async function getSetting(key: SettingKey, client: Tx = db) {
+  const row = await client.setting.findUnique({ where: { key } });
   return row?.value ?? DEFAULT_SETTINGS[key];
 }
 
-export async function getBool(key: SettingKey) {
-  return (await getSetting(key)) === "true";
+export async function getBool(key: SettingKey, client: Tx = db) {
+  return (await getSetting(key, client)) === "true";
 }
 
-export async function getNumber(key: SettingKey) {
-  return Number(await getSetting(key));
+export async function getNumber(key: SettingKey, client: Tx = db) {
+  return Number(await getSetting(key, client));
 }
 
-export async function getList(key: SettingKey) {
-  return (await getSetting(key)).split(",").map((s) => s.trim()).filter(Boolean);
+export async function getList(key: SettingKey, client: Tx = db) {
+  return (await getSetting(key, client)).split(",").map((s) => s.trim()).filter(Boolean);
 }
