@@ -1,103 +1,92 @@
-import Image from "next/image";
+import Link from "next/link";
+import { db } from "@/lib/db";
+import { ListingCard, CampaignCard } from "@/components/Cards";
+import { autoLockDue } from "@/lib/campaigns";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  await autoLockDue();
+  const [banners, categories, featured, latest, campaigns, results] = await Promise.all([
+    db.banner.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    db.category.findMany({ where: { parentId: null, active: true }, orderBy: { sortOrder: "asc" } }),
+    db.listing.findMany({ where: { status: "ACTIVE", featured: true }, include: { images: { orderBy: { sortOrder: "asc" } }, category: true }, take: 4, orderBy: { publishedAt: "desc" } }),
+    db.listing.findMany({ where: { status: "ACTIVE" }, include: { images: { orderBy: { sortOrder: "asc" } }, category: true }, take: 8, orderBy: { publishedAt: "desc" } }),
+    db.campaign.findMany({ where: { status: "APPROVED" }, include: { images: true, listing: { include: { images: true } } }, take: 3, orderBy: { drawAt: "asc" } }),
+    db.drawResult.findMany({ where: { status: "PUBLISHED" }, include: { campaign: true }, take: 3, orderBy: { publishedAt: "desc" } }),
+  ]);
+  const hero = banners[0];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div>
+      <section className="bg-gradient-to-br from-brand-700 to-brand-500 text-white">
+        <div className="container-page grid gap-8 py-14 md:grid-cols-2 md:items-center">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">{hero?.title ?? "Buy and sell with verified Australians"}</h1>
+            <p className="mt-3 text-lg text-blue-100">{hero?.subtitle ?? "Every seller is ID-checked. Every listing is reviewed."}</p>
+            <form action="/marketplace" className="mt-6 flex max-w-lg gap-2">
+              <input name="q" className="input text-ink" placeholder="What are you looking for?" aria-label="Search" />
+              <button className="btn bg-white text-brand-700 hover:bg-blue-50">Search</button>
+            </form>
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <Link href="/register/seller" className="rounded-full bg-white/15 px-3 py-1 hover:bg-white/25">Become a verified seller →</Link>
+              <Link href="/draws" className="rounded-full bg-white/15 px-3 py-1 hover:bg-white/25">Browse promotions →</Link>
+            </div>
+          </div>
+          <ul className="grid grid-cols-2 gap-3 text-sm">
+            {[["✅", "Verified sellers", "Identity & business checks before anyone can sell"], ["🔍", "Reviewed listings", "Every listing is approved before it goes live"], ["🔒", "Secure payments", "Payment is confirmed by the gateway — never the browser"], ["🎲", "Auditable draws", "Commit-reveal randomness anyone can verify"]].map(([i, t, d]) => (
+              <li key={t} className="rounded-xl bg-white/10 p-4"><div className="text-2xl">{i}</div><div className="mt-1 font-semibold">{t}</div><div className="text-blue-100">{d}</div></li>
+            ))}
+          </ul>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </section>
+
+      <div className="container-page space-y-12 py-10">
+        <section>
+          <h2 className="h2 mb-4">Browse categories</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            {categories.map((c) => (
+              <Link key={c.id} href={`/marketplace/${c.slug}`} className="card flex flex-col items-center gap-2 p-4 text-center text-sm font-medium hover:shadow-md">
+                <span className="text-3xl" aria-hidden="true">{c.icon}</span>{c.name}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {featured.length > 0 && (
+          <section>
+            <h2 className="h2 mb-4">Featured listings</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{featured.map((l) => <ListingCard key={l.id} l={l} />)}</div>
+          </section>
+        )}
+
+        {campaigns.length > 0 && (
+          <section>
+            <div className="mb-4 flex items-end justify-between"><h2 className="h2">Promotions & draws</h2><Link href="/draws" className="link text-sm">All promotions →</Link></div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{campaigns.map((c) => <CampaignCard key={c.id} c={c} />)}</div>
+          </section>
+        )}
+
+        <section>
+          <div className="mb-4 flex items-end justify-between"><h2 className="h2">Latest listings</h2><Link href="/marketplace" className="link text-sm">View all →</Link></div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{latest.map((l) => <ListingCard key={l.id} l={l} />)}</div>
+        </section>
+
+        {results.length > 0 && (
+          <section>
+            <h2 className="h2 mb-4">Recent winners</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {results.map((r) => (
+                <Link key={r.id} href={`/results/${r.campaign.slug}`} className="card card-pad hover:shadow-md">
+                  <div className="text-sm text-muted">{r.campaign.prizeName}</div>
+                  <div className="mt-1 font-mono text-2xl font-bold">#{r.winningNumber}</div>
+                  <div className="text-sm">{r.winnerDisplayName}</div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

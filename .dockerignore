@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+!.env.example
+uploads
+private-uploads
+prisma/*.db
+prisma/*.db-journal
+*.tsbuildinfo
+npm-debug.log*
+Dockerfile
+docker-compose*.yml

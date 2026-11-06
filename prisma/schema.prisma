@@ -1,0 +1,718 @@
+// SellEasy — Verified Marketplace & Promotions Platform
+// PostgreSQL (local: docker compose up -d db). Migrations live in prisma/migrations.
+// Money is stored as integer cents (AUD); rates as basis points (1% = 100 bps).
+// Status values are strings; allowed values are documented in src/lib/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- identity
+
+/// Sequences for platform IDs (BUY, SEL, BUS, ADM)
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
+
+model User {
+  id               String    @id @default(cuid())
+  publicId         String    @unique // BUY-000001 / SEL-000001 / BUS-000001 / ADM-000001 (backend-generated, immutable)
+  email            String    @unique // stored normalised (trimmed, lower-case)
+  passwordHash     String
+  firstName        String
+  lastName         String
+  name             String // full name, kept in sync
+  displayName      String? // public name if they win a draw
+  mobile           String?   @unique
+  role             String    @default("BUYER") // BUYER | SELLER | ADMIN
+  // REGISTERED | EMAIL_PENDING | MOBILE_PENDING | ACTIVE | VERIFICATION_REQUIRED | RESTRICTED | SUSPENDED | CLOSED
+  accountStatus    String    @default("EMAIL_PENDING")
+  statusReason     String?
+  emailVerifiedAt  DateTime?
+  emailVerifyToken String?   @unique
+  mobileVerifiedAt DateTime?
+  mobileOtpHash    String?
+  mobileOtpExpires DateTime?
+  mobileOtpTries   Int       @default(0)
+  idVerifiedAt     DateTime?
+  termsAcceptedAt  DateTime?
+  country          String    @default("AU")
+  state            String?
+  suburb           String?
+  postcode         String?
+  dateOfBirth      DateTime?
+  riskFlags        String? // comma separated flags from duplicate/risk screening
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  sessions        Session[]
+  sellerProfile   SellerProfile?
+  listings        Listing[]        @relation("SellerListings")
+  enquiriesSent   Enquiry[]        @relation("BuyerEnquiries")
+  enquiriesRecv   Enquiry[]        @relation("SellerEnquiries")
+  ordersPlaced    Order[]          @relation("BuyerOrders")
+  ordersReceived  Order[]          @relation("SellerOrders")
+  payments        Payment[]
+  campaigns       Campaign[]       @relation("SellerCampaigns")
+  tickets         Ticket[]
+  ticketPurchases TicketPurchase[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  salesAsBuyer    Sale[]           @relation("SaleBuyer")
+  salesAsSeller   Sale[]           @relation("SaleSeller")
+  wishlist        WishlistItem[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model SellerProfile {
+  id                   String           @id @default(cuid())
+  userId               String           @unique
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerCode           String           @unique // SEL-000001 (individual) / BUS-000001 (business)
+  sellerType           String           @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
+  legalName            String
+  businessName         String?
+  abn                  String?
+  acn                  String?
+  authorisedRep        String?
+  address              String
+  state                String?
+  postcode             String?
+  bio                  String?
+  // REGISTERED | VERIFICATION_PENDING | DOCUMENTS_REQUIRED | UNDER_REVIEW | APPROVED | ACTIVE | SUSPENDED | REJECTED | CLOSED
+  status               String           @default("VERIFICATION_PENDING")
+  statusReason         String?
+  approvedById         String?
+  approvedAt           DateTime?
+  trustedSeller        Boolean          @default(false) // listings auto-approve if the approval rule allows it
+  canRunFreeDraws      Boolean          @default(false)
+  canRunPaidDraws      Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  documents            SellerDocument[]
+  paymentAccount       PaymentAccount?
+}
+
+model SellerDocument {
+  id           String        @id @default(cuid())
+  sellerId     String
+  seller       SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  documentType String // ID_DRIVER_LICENCE | ID_PASSPORT | PROOF_OF_ADDRESS | ABN_CERTIFICATE | AUTHORITY_LETTER | OTHER
+  fileKey      String // stored in private storage, never publicly served
+  fileName     String
+  status       String        @default("SUBMITTED") // SUBMITTED | ACCEPTED | REJECTED
+  reviewedById String?
+  reviewNote   String?
+  createdAt    DateTime      @default(now())
+}
+
+/// Seller's account at the payment provider (e.g. Stripe Connect connected account)
+model PaymentAccount {
+  id                String        @id @default(cuid())
+  sellerId          String        @unique
+  seller            SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  provider          String
+  providerAccountId String        @unique
+  chargesEnabled    Boolean       @default(false)
+  payoutsEnabled    Boolean       @default(false)
+  restricted        Boolean       @default(false)
+  payoutsHeld       Boolean       @default(false) // admin hold for fraud/dispute
+  updatedAt         DateTime      @updatedAt
+}
+
+// ---------------------------------------------------------------- catalogue
+
+model Category {
+  id            String              @id @default(cuid())
+  name          String
+  slug          String              @unique
+  icon          String?
+  parentId      String?
+  parent        Category?           @relation("CategoryTree", fields: [parentId], references: [id])
+  children      Category[]          @relation("CategoryTree")
+  sortOrder     Int                 @default(0)
+  active        Boolean             @default(true)
+  highValue     Boolean             @default(false) // cars/property: enquiry + reported sale, no online checkout
+  listings      Listing[]           @relation("ListingCategory")
+  subListings   Listing[]           @relation("ListingSubcategory")
+  attributes    CategoryAttribute[]
+  commissionRules CommissionRule[]
+  offers        Offer[]
+}
+
+/// Admin-defined fields for the dynamic listing form
+model CategoryAttribute {
+  id         String             @id @default(cuid())
+  categoryId String
+  category   Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  key        String
+  label      String
+  type       String             @default("text") // text | number | select | boolean | date
+  options    String? // comma separated for select
+  unit       String?
+  required   Boolean            @default(false)
+  isPrivate  Boolean            @default(false) // e.g. VIN: visible to seller & admin only
+  filterable Boolean            @default(false)
+  sortOrder  Int                @default(0)
+  values     ListingAttribute[]
+
+  @@unique([categoryId, key])
+}
+
+model Listing {
+  id            String             @id @default(cuid())
+  sellerId      String
+  seller        User               @relation("SellerListings", fields: [sellerId], references: [id])
+  title         String
+  categoryId    String
+  category      Category           @relation("ListingCategory", fields: [categoryId], references: [id])
+  subcategoryId String?
+  subcategory   Category?          @relation("ListingSubcategory", fields: [subcategoryId], references: [id])
+  description   String
+  declaredValue Int? // seller's declared product value (cents)
+  price         Int // selling price (cents)
+  deliveryFee   Int                @default(0)
+  condition     String             @default("USED") // NEW | USED | REFURBISHED
+  brand         String?
+  model         String?
+  location      String
+  state         String?
+  postcode      String?
+  videoUrl      String?
+  contactPhone  String?
+  contactEmail  String?
+  allowEnquiry  Boolean            @default(true)
+  allowCheckout Boolean            @default(false)
+  quantity      Int                @default(1)
+  availability  String             @default("AVAILABLE")
+  // DRAFT | PENDING | ACTIVE | PAUSED | SOLD | REJECTED | EXPIRED | SUSPENDED
+  status        String             @default("DRAFT")
+  statusReason  String?
+  seoTitle      String?
+  seoDescription String?
+  keywords      String?
+  featured      Boolean            @default(false)
+  views         Int                @default(0)
+  publishedAt   DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  images        ListingImage[]
+  attributes    ListingAttribute[]
+  enquiries     Enquiry[]
+  orderItems    OrderItem[]
+  sales         Sale[]
+  campaigns     Campaign[]
+  offers        Offer[]
+  wishlistedBy  WishlistItem[]
+
+  @@index([status, categoryId])
+}
+
+model ListingAttribute {
+  id          String            @id @default(cuid())
+  listingId   String
+  listing     Listing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  attributeId String
+  attribute   CategoryAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  value       String
+
+  @@unique([listingId, attributeId])
+}
+
+model ListingImage {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int     @default(0)
+}
+
+model WishlistItem {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, listingId])
+}
+
+model Enquiry {
+  id        String    @id @default(cuid())
+  listingId String
+  listing   Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User      @relation("BuyerEnquiries", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User      @relation("SellerEnquiries", fields: [sellerId], references: [id])
+  message   String
+  reply     String?
+  repliedAt DateTime?
+  status    String    @default("OPEN") // OPEN | REPLIED | CLOSED
+  createdAt DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------- offers
+
+model Offer {
+  id            String       @id @default(cuid())
+  sellerId      String
+  name          String
+  description   String?
+  listingId     String?
+  listing       Listing?     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      Category?    @relation(fields: [categoryId], references: [id])
+  type          String // PERCENT | FIXED | FREE_DELIVERY
+  value         Int          @default(0) // bps for PERCENT, cents for FIXED
+  minQuantity   Int          @default(1)
+  minSubtotal   Int          @default(0)
+  maxDiscount   Int? // cents cap
+  couponCode    String?
+  startsAt      DateTime
+  endsAt        DateTime
+  usageLimit    Int?
+  perBuyerLimit Int?
+  usedCount     Int          @default(0)
+  status        String       @default("PENDING") // PENDING | APPROVED | REJECTED | PAUSED
+  statusReason  String?
+  createdAt     DateTime     @default(now())
+  usages        OfferUsage[]
+
+  @@unique([sellerId, couponCode])
+}
+
+model OfferUsage {
+  id        String   @id @default(cuid())
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id])
+  buyerId   String
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  discount  Int
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- orders, sales & commission
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  buyerId         String
+  buyer           User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId        String
+  seller          User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  // PENDING_PAYMENT | PAID | FULFILLED | COMPLETED | CANCELLED | REFUNDED
+  status          String      @default("PENDING_PAYMENT")
+  subtotal        Int
+  discount        Int         @default(0)
+  deliveryFee     Int         @default(0)
+  total           Int
+  offerId         String?
+  shippingName    String?
+  shippingAddress String?
+  notes           String?
+  fulfilledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+  payments        Payment[]
+  sale            Sale?
+  offerUsage      OfferUsage?
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  title     String
+  unitPrice Int
+  quantity  Int
+}
+
+/// A completed sale — the only thing that can generate commission.
+/// ONLINE sales come from paid orders; OFFLINE sales are reported by the seller (cars, property).
+model Sale {
+  id               String            @id @default(cuid())
+  saleNumber       String            @unique
+  source           String // ONLINE | OFFLINE
+  orderId          String?           @unique
+  order            Order?            @relation(fields: [orderId], references: [id])
+  listingId        String
+  listing          Listing           @relation(fields: [listingId], references: [id])
+  buyerId          String
+  buyer            User              @relation("SaleBuyer", fields: [buyerId], references: [id])
+  sellerId         String
+  seller           User              @relation("SaleSeller", fields: [sellerId], references: [id])
+  salePrice        Int
+  // REPORTED | BUYER_CONFIRMED | UNDER_REVIEW | MORE_INFO | APPROVED | REJECTED | REVERSED
+  status           String            @default("REPORTED")
+  sellerNote       String?
+  buyerConfirmedAt DateTime?
+  buyerDisputed    Boolean           @default(false)
+  adminApprovedAt  DateTime?
+  approvedById     String?
+  adminNote        String?
+  createdAt        DateTime          @default(now())
+  commission       CommissionRecord?
+  payout           Payout?
+}
+
+model CommissionRule {
+  id            String    @id @default(cuid())
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  sellerId      String? // seller-specific override (User.id)
+  rateBps       Int
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+}
+
+model CommissionRecord {
+  id           String             @id @default(cuid())
+  saleId       String             @unique // one commission per eligible sale
+  sale         Sale               @relation(fields: [saleId], references: [id])
+  sellerId     String
+  buyerId      String
+  ruleId       String?
+  rateBps      Int
+  baseAmount   Int
+  amount       Int
+  settlement   String // DEDUCTED (online: taken before payout) | INVOICE (offline: seller invoiced)
+  // PENDING_APPROVAL | GENERATED | INVOICED | PAID | OVERDUE | REVERSED | WAIVED | REJECTED
+  status       String             @default("PENDING_APPROVAL")
+  approvedById String?
+  approvedAt   DateTime?
+  adjustReason String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  invoice      CommissionInvoice?
+}
+
+model CommissionInvoice {
+  id            String           @id @default(cuid())
+  invoiceNumber String           @unique
+  sellerId      String
+  commissionId  String           @unique
+  commission    CommissionRecord @relation(fields: [commissionId], references: [id])
+  amount        Int
+  dueDate       DateTime
+  status        String           @default("ISSUED") // ISSUED | PAID | OVERDUE | VOID
+  paidAt        DateTime?
+  markedPaidById String?
+  reference     String?
+  createdAt     DateTime         @default(now())
+}
+
+model Payout {
+  id        String    @id @default(cuid())
+  sellerId  String
+  saleId    String    @unique
+  sale      Sale      @relation(fields: [saleId], references: [id])
+  gross     Int
+  commission Int
+  amount    Int
+  status    String    @default("SCHEDULED") // SCHEDULED | HELD | PAID | CANCELLED
+  holdReason String?
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------- payments
+// `ledger` keeps product money and promotion/ticket money separate for accounting & compliance.
+
+model Payment {
+  id               String          @id @default(cuid())
+  receiptNumber    String          @unique
+  ledger           String // PRODUCT | TICKET
+  userId           String
+  user             User            @relation(fields: [userId], references: [id])
+  sellerId         String?
+  amount           Int
+  currency         String          @default("AUD")
+  // PENDING | PROCESSING | SUCCEEDED | FAILED | UNDER_REVIEW | REFUND_REQUESTED | PARTIALLY_REFUNDED | REFUNDED | DISPUTED | CANCELLED
+  status           String          @default("PENDING")
+  provider         String
+  providerRef      String?         @unique
+  method           String?
+  failureReason    String?
+  idempotencyKey   String          @unique
+  orderId          String?
+  order            Order?          @relation(fields: [orderId], references: [id])
+  ticketPurchaseId String?         @unique
+  ticketPurchase   TicketPurchase? @relation(fields: [ticketPurchaseId], references: [id])
+  expiresAt        DateTime
+  paidAt           DateTime?
+  createdAt        DateTime        @default(now())
+  refunds          Refund[]
+
+  @@index([ledger, status])
+}
+
+model WebhookEvent {
+  id          String   @id // provider event id — unique, so replays are ignored
+  provider    String
+  type        String
+  payload     String
+  result      String?
+  receivedAt  DateTime @default(now())
+}
+
+model Refund {
+  id            String    @id @default(cuid())
+  paymentId     String
+  payment       Payment   @relation(fields: [paymentId], references: [id])
+  amount        Int
+  reason        String
+  status        String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | PROCESSED
+  requestedById String
+  processedById String?
+  processedAt   DateTime?
+  adminNote     String?
+  createdAt     DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------- promotions / ticketing & draws
+
+model Campaign {
+  id                    String           @id @default(cuid())
+  slug                  String           @unique
+  sellerId              String
+  seller                User             @relation("SellerCampaigns", fields: [sellerId], references: [id])
+  listingId             String? // the approved product being promoted
+  listing               Listing?         @relation(fields: [listingId], references: [id])
+  title                 String
+  description           String
+  prizeName             String
+  prizeValue            Int
+  prizeDelivery         String
+  ticketType            String // PAID | FREE  (never mixed within one campaign)
+  ticketPrice           Int              @default(0)
+  totalTickets          Int
+  maxPerBuyer           Int
+  drawMode              String           @default("FIXED") // FIXED | SOLD_OUT (sold-out trigger, only if approved terms allow)
+  salesOpenAt           DateTime
+  salesCloseAt          DateTime
+  drawAt                DateTime
+  timezone              String           @default("Australia/Sydney")
+  terms                 String
+  fallbackProcedure     String? // what happens if an extension isn't permitted
+  allowedStates         String? // comma separated AU states; empty = all permitted
+  minAge                Int              @default(18)
+  requireIdVerification Boolean          @default(false)
+  permitNumber          String?
+  legalNotes            String?
+  legalReviewConfirmed  Boolean          @default(false)
+  // DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | SALES_CLOSED | DRAW_COMPLETED | WINNER_ANNOUNCED | COMPLETED | CANCELLED | SUSPENDED
+  status                String           @default("DRAFT")
+  statusReason          String?
+  scheduleApproved      Boolean          @default(false)
+  nextTicketNumber      Int              @default(1)
+  ticketsAllocated      Int              @default(0)
+  soldOutAt             DateTime?
+  lockedAt              DateTime?
+  eligibleCount         Int?
+  eligibleHash          String?
+  seedCommitment        String?
+  drawSeed              String?
+  prizeDeliveredAt      DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  images                CampaignImage[]
+  tickets               Ticket[]
+  purchases             TicketPurchase[]
+  schedules             DrawSchedule[]
+  result                DrawResult?
+  auditLogs             DrawAuditLog[]
+}
+
+model CampaignImage {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  url        String
+  sortOrder  Int      @default(0)
+}
+
+model TicketPurchase {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
+  buyerId        String
+  buyer          User     @relation(fields: [buyerId], references: [id])
+  quantity       Int
+  amount         Int
+  status         String   @default("PENDING") // PENDING | PAID | FREE_CLAIMED | FAILED | REFUNDED | CANCELLED
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  tickets        Ticket[]
+  payment        Payment?
+}
+
+model Ticket {
+  id             String         @id @default(cuid())
+  campaignId     String
+  campaign       Campaign       @relation(fields: [campaignId], references: [id])
+  number         Int
+  ticketNumber   String
+  buyerId        String
+  buyer          User           @relation(fields: [buyerId], references: [id])
+  purchaseId     String
+  purchase       TicketPurchase @relation(fields: [purchaseId], references: [id])
+  allocationType String // PAID | FREE
+  status         String         @default("VALID") // VALID | VOID
+  createdAt      DateTime       @default(now())
+
+  @@unique([campaignId, number])
+  @@unique([campaignId, ticketNumber])
+  @@index([buyerId])
+}
+
+/// Initial schedule and every extension / date-change request. Seller proposes, admin decides.
+model DrawSchedule {
+  id           String    @id @default(cuid())
+  campaignId   String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind         String    @default("INITIAL") // INITIAL | EXTENSION
+  drawAt       DateTime
+  salesCloseAt DateTime
+  timezone     String
+  reason       String
+  status       String    @default("PROPOSED") // PROPOSED | APPROVED | REJECTED
+  proposedById String
+  reviewedById String?
+  reviewNote   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model DrawResult {
+  id                String    @id @default(cuid())
+  campaignId        String    @unique
+  campaign          Campaign  @relation(fields: [campaignId], references: [id])
+  eligibleCount     Int
+  eligibleHash      String
+  seed              String
+  seedCommitment    String
+  method            String
+  winningIndex      Int
+  winningTicketId   String
+  winningNumber     String
+  winnerUserId      String
+  winnerDisplayName String
+  drawnById         String
+  drawnAt           DateTime  @default(now())
+  status            String    @default("DRAWN") // DRAWN | PUBLISHED
+  verifiedById      String?
+  publishedAt       DateTime?
+  videoUrl          String?
+  resultHash        String
+}
+
+/// Append-only, hash-chained log of every draw-related action (per campaign).
+model DrawAuditLog {
+  id         String   @id @default(cuid())
+  seq        Int
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  action     String
+  actorId    String?
+  details    String
+  prevHash   String
+  hash       String
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, seq])
+}
+
+// ---------------------------------------------------------------- platform
+
+/// Approval & admin activity log (entity_type, entity_id, action, admin, reason)
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  reason     String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// Outbound email/SMS log (dev outbox). Swap delivery for a real provider in production.
+model MessageLog {
+  id        String   @id @default(cuid())
+  channel   String   @default("EMAIL") // EMAIL | SMS
+  to        String
+  subject   String
+  body      String
+  status    String   @default("LOGGED")
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model Page {
+  slug      String   @id
+  title     String
+  content   String
+  updatedAt DateTime @updatedAt
+}
+
+model Banner {
+  id        String  @id @default(cuid())
+  title     String
+  subtitle  String?
+  link      String?
+  imageUrl  String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+}

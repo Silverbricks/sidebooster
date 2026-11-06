@@ -12,6 +12,10 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    // file downloads go to /api route handlers, where a plain <a> is correct
+    rules: { "@next/next/no-html-link-for-pages": "off" },
+  },
+  {
     ignores: [
       "node_modules/**",
       ".next/**",
