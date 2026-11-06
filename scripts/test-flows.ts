@@ -61,7 +61,8 @@ async function main() {
       return db.user.create({ data: { publicId, email: `p${i}@t.test`, passwordHash: "x", firstName: "P", lastName: `${i}`, name: `P ${i}`, accountStatus: "ACTIVE", state: "QLD", dateOfBirth: new Date("1990-01-01") } });
     }));
     const results = await Promise.allSettled(people.map((p, i) => claimFreeTickets(open.id, p, 1, `c${i}`)));
-    assert.equal(results.filter((r) => r.status === "fulfilled").length, 3);
+    const reasons = results.flatMap((r) => (r.status === "rejected" ? [String((r.reason as Error)?.message ?? r.reason).slice(0, 300)] : []));
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 3, `rejections: ${JSON.stringify(reasons)}`);
     const tickets = await db.ticket.findMany({ where: { campaignId: open.id } });
     assert.equal(tickets.length, 10);
     assert.equal(new Set(tickets.map((t) => t.number)).size, 10);
