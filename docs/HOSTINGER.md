@@ -32,6 +32,17 @@ In **hPanel → VPS → Security → Firewall**, create a rule set that **allows
 
 **Delete any other existing `A`, `AAAA` or `CNAME` records for `@` and `www`**, such as Hostinger's parking page. Otherwise HTTPS certificates will fail.
 
+### Domain registered at GoDaddy
+
+Keep the domain at GoDaddy and only change its DNS records. Don't change the nameservers.
+
+1. Log in at godaddy.com → profile icon → **My Products** → next to `sidebooster.com` choose **DNS** (or **Manage DNS**).
+2. **A record `@`:** find the A record named `@` (it usually says *Parked*), click the pencil, set **Value** to your VPS IP, set **TTL** to 600 seconds (or the lowest option), and save. If there are several `@` A records, delete the extra ones.
+3. **`www`:** GoDaddy normally has `CNAME www → @`. Leave it as it is; it follows the `@` record. If `www` is missing, add **CNAME** `www` → `@`.
+4. **Delete** any **AAAA** records for `@` or `www`.
+5. Under **Forwarding** (same page, or Domain Settings), make sure **domain forwarding is OFF**.
+6. Leave MX, TXT and CNAME records for email (e.g. `email`, `autodiscover`) as they are.
+
 Check it from your computer. Both should show your VPS IP; it can take a few minutes up to a few hours.
 
 ```powershell
