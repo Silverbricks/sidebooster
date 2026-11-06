@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logoutAction } from "@/app/actions/auth";
+import { Logo } from "@/components/branding/Logo";
 
 const NAV = [
   ["Marketplace", "/marketplace"],
@@ -22,10 +23,7 @@ export async function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur">
       <div className="container-page flex h-16 items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-ink">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">S</span>
-          SellEasy
-        </Link>
+        <Logo />
         <form action="/marketplace" className="hidden flex-1 md:block">
           <input name="q" placeholder="Search cars, phones, property…" className="input max-w-md" aria-label="Search listings" />
         </form>

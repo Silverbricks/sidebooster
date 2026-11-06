@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -30,7 +31,7 @@ export default async function DrawsPage({ searchParams }: { searchParams: Promis
     <div className="container-page py-8">
       <h1 className="h1">Tickets & Draws</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Every promotion is approved by SellEasy before it opens. Draws use a published, verifiable random method and every step is recorded in a tamper-evident audit log.{" "}
+        Every promotion is approved by {brand.name} before it opens. Draws use a published, verifiable random method and every step is recorded in a tamper-evident audit log.{" "}
         <Link href="/responsible-participation" className="link">Eligibility & responsible participation</Link>
       </p>
       <nav className="mt-6 flex gap-2 overflow-x-auto" aria-label="Draw filters">

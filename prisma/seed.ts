@@ -43,9 +43,9 @@ async function main() {
   // ---- users
   const pw = await bcrypt.hash("Password123", 12);
   const verified = { emailVerifiedAt: new Date(), mobileVerifiedAt: new Date(), termsAcceptedAt: new Date(), accountStatus: "ACTIVE" };
-  const admin = await db.user.create({ data: { publicId: "ADM-000001", email: "admin@selleasy.test", passwordHash: pw, firstName: "Super", lastName: "Admin", name: "Super Admin", mobile: "+61400000001", role: "ADMIN", ...verified } });
+  const admin = await db.user.create({ data: { publicId: "ADM-000001", email: "admin@sidebooster.test", passwordHash: pw, firstName: "Super", lastName: "Admin", name: "Super Admin", mobile: "+61400000001", role: "ADMIN", ...verified } });
   const seller = await db.user.create({
-    data: { publicId: "SEL-000001", email: "seller@selleasy.test", passwordHash: pw, firstName: "Sam", lastName: "Seller", name: "Sam Seller", mobile: "+61400000002", role: "SELLER", state: "QLD", postcode: "4000", dateOfBirth: new Date("1985-04-12"), ...verified },
+    data: { publicId: "SEL-000001", email: "seller@sidebooster.test", passwordHash: pw, firstName: "Sam", lastName: "Seller", name: "Sam Seller", mobile: "+61400000002", role: "SELLER", state: "QLD", postcode: "4000", dateOfBirth: new Date("1985-04-12"), ...verified },
   });
   const sp = await db.sellerProfile.create({
     data: { userId: seller.id, sellerCode: "SEL-000001", sellerType: "INDIVIDUAL", legalName: "Samuel Seller", address: "1 Queen St, Brisbane QLD 4000", state: "QLD", postcode: "4000", status: "ACTIVE", approvedById: admin.id, approvedAt: new Date(now - 30 * DAY), canRunFreeDraws: true, canRunPaidDraws: false, trustedSeller: false, bio: "Quality pre-owned tech and vehicles in Brisbane." },
@@ -53,17 +53,17 @@ async function main() {
   await db.paymentAccount.create({ data: { sellerId: sp.id, provider: "test", providerAccountId: `test_acct_${sp.id}`, chargesEnabled: true, payoutsEnabled: true } });
 
   const biz = await db.user.create({
-    data: { publicId: "BUS-000001", email: "business@selleasy.test", passwordHash: pw, firstName: "Bella", lastName: "Business", name: "Bella Business", mobile: "+61400000003", role: "SELLER", state: "NSW", postcode: "2000", ...verified },
+    data: { publicId: "BUS-000001", email: "business@sidebooster.test", passwordHash: pw, firstName: "Bella", lastName: "Business", name: "Bella Business", mobile: "+61400000003", role: "SELLER", state: "NSW", postcode: "2000", ...verified },
   });
   await db.sellerProfile.create({
     data: { userId: biz.id, sellerCode: "BUS-000001", sellerType: "BUSINESS", legalName: "Harbour Motors Pty Ltd", businessName: "Harbour Motors", abn: "51824753556", authorisedRep: "Bella Business", address: "10 George St, Sydney NSW 2000", state: "NSW", postcode: "2000", status: "UNDER_REVIEW" },
   });
 
   const buyer = await db.user.create({
-    data: { publicId: "BUY-000001", email: "buyer@selleasy.test", passwordHash: pw, firstName: "Bob", lastName: "Buyer", name: "Bob Buyer", mobile: "+61400000004", role: "BUYER", state: "QLD", postcode: "4101", suburb: "South Brisbane", dateOfBirth: new Date("1990-06-01"), ...verified },
+    data: { publicId: "BUY-000001", email: "buyer@sidebooster.test", passwordHash: pw, firstName: "Bob", lastName: "Buyer", name: "Bob Buyer", mobile: "+61400000004", role: "BUYER", state: "QLD", postcode: "4101", suburb: "South Brisbane", dateOfBirth: new Date("1990-06-01"), ...verified },
   });
   const buyer2 = await db.user.create({
-    data: { publicId: "BUY-000002", email: "buyer2@selleasy.test", passwordHash: pw, firstName: "Alice", lastName: "Nguyen", name: "Alice Nguyen", mobile: "+61400000005", role: "BUYER", state: "NSW", postcode: "2010", dateOfBirth: new Date("1994-11-20"), ...verified },
+    data: { publicId: "BUY-000002", email: "buyer2@sidebooster.test", passwordHash: pw, firstName: "Alice", lastName: "Nguyen", name: "Alice Nguyen", mobile: "+61400000005", role: "BUYER", state: "NSW", postcode: "2010", dateOfBirth: new Date("1994-11-20"), ...verified },
   });
   for (const [k, v] of [["ADM", 1], ["SEL", 1], ["BUS", 1], ["BUY", 2]] as const) await db.counter.create({ data: { key: k, value: v } });
 
@@ -143,10 +143,10 @@ async function main() {
   for (const [slug, title, content] of PAGES) await db.page.create({ data: { slug, title, content } });
   await db.banner.create({ data: { title: "Buy and sell with verified Australians", subtitle: "Every seller is ID-checked. Every listing is reviewed.", link: "/marketplace", sortOrder: 0 } });
   await db.banner.create({ data: { title: "Free-entry promotions are live", subtitle: "Claim a free ticket for a chance to win a Dell XPS 15.", link: "/draws/win-a-dell-xps-15", sortOrder: 1 } });
-  await db.notification.create({ data: { userId: buyer.id, type: "WELCOME", title: "Welcome to SellEasy", body: "Your Buyer ID is BUY-000001." } });
+  await db.notification.create({ data: { userId: buyer.id, type: "WELCOME", title: "Welcome to SideBooster", body: "Your Buyer ID is BUY-000001." } });
 
   console.log("Seeded. Logins (password: Password123):");
-  console.log("  admin@selleasy.test (ADM-000001)\n  seller@selleasy.test (SEL-000001, active)\n  business@selleasy.test (BUS-000001, under review)\n  buyer@selleasy.test (BUY-000001)\n  buyer2@selleasy.test (BUY-000002)");
+  console.log("  admin@sidebooster.test (ADM-000001)\n  seller@sidebooster.test (SEL-000001, active)\n  business@sidebooster.test (BUS-000001, under review)\n  buyer@sidebooster.test (BUY-000001)\n  buyer2@sidebooster.test (BUY-000002)");
 }
 
 

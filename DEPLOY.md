@@ -1,6 +1,6 @@
-# Deploying SellEasy
+# Deploying SideBooster
 
-SellEasy ships as one Docker image. Each time the container starts it:
+SideBooster ships as one Docker image. Each time the container starts it:
 
 1. applies database migrations (`prisma migrate deploy`);
 2. runs the safe bootstrap (`npm run bootstrap`): it adds the default categories and pages and creates the first Super Admin if none exists, and **never deletes data**;
@@ -55,7 +55,7 @@ The server refuses to start in production if `DATABASE_URL`, `APP_URL`, `CRON_SE
 On an Ubuntu server with Docker installed:
 
 ```bash
-git clone <your-repo-url> selleasy && cd selleasy
+git clone <your-repo-url> sidebooster && cd sidebooster
 cp .env.example .env.production      # fill in step-1 values; DATABASE_URL is set by compose
 export POSTGRES_PASSWORD='<strong password>'
 docker compose --profile app up -d --build
@@ -80,7 +80,7 @@ To update: `git pull && docker compose --profile app up -d --build`.
 
 - **Database:** turn on daily automated backups with point-in-time recovery if available. On a VPS, run a daily cron job and copy the dump off the server:
   ```bash
-  docker compose exec -T db pg_dump -U selleasy selleasy | gzip > backup-$(date +%F).sql.gz
+  docker compose exec -T db pg_dump -U sidebooster sidebooster | gzip > backup-$(date +%F).sql.gz
   ```
 - **Files:** snapshot the `/data` volume daily. It holds listing photos and private ID documents, so keep the backups encrypted.
 - **`ENCRYPTION_KEY`:** store it in a password manager. Losing it makes encrypted fields unreadable.
@@ -137,8 +137,8 @@ The Stripe adapter is written to Stripe's documented API but **has not yet been 
 
 ```bash
 docker compose up -d db
-docker build -t selleasy .
+docker build -t sidebooster .
 docker run --rm -p 3000:3000 --env-file .env \
-  -e DATABASE_URL=postgresql://selleasy:selleasy@host.docker.internal:5432/selleasy \
-  -e APP_URL=http://localhost:3000 -e ALLOW_TEST_PAYMENTS=true selleasy
+  -e DATABASE_URL=postgresql://sidebooster:sidebooster@host.docker.internal:5432/sidebooster \
+  -e APP_URL=http://localhost:3000 -e ALLOW_TEST_PAYMENTS=true sidebooster
 ```

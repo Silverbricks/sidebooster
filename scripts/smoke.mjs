@@ -22,7 +22,7 @@ const car = await db.listing.findFirst({ where: { title: { contains: "RAV4" } } 
 const campaign = await db.campaign.findFirst({ where: { slug: "win-a-dell-xps-15" } });
 const due = await db.campaign.findFirst({ where: { slug: "win-a-weekend-getaway" } });
 const sellerProfile = await db.sellerProfile.findFirst({ where: { sellerCode: "BUS-000001" } });
-const ticket = await db.ticket.findFirst({ where: { buyer: { email: "buyer@selleasy.test" } } });
+const ticket = await db.ticket.findFirst({ where: { buyer: { email: "buyer@sidebooster.test" } } });
 
 const pages = {
   anon: ["/", "/marketplace", "/marketplace/cars-vehicles", "/marketplace/mobile-phones?a_brand=Apple", "/marketplace?q=iphone&min=100&sort=price_asc", `/listing/${listing.id}`, `/listing/${car.id}`, "/draws", "/draws?tab=upcoming", "/draws?tab=previous", `/draws/${campaign.slug}`, "/results", `/results/${due.slug}`, "/about", "/contact", "/terms", "/privacy", "/refund-policy", "/responsible-participation", "/register", "/register/seller", "/login", "/sitemap.xml", "/robots.txt"],
@@ -30,7 +30,7 @@ const pages = {
   seller: ["/seller", "/seller/verification", "/seller/payouts", "/seller/listings", "/seller/listings/new", `/seller/listings/${listing.id}`, "/seller/offers", "/seller/orders", "/seller/enquiries", "/seller/sales", "/seller/commissions", "/seller/campaigns", "/seller/campaigns/new", `/seller/campaigns/${campaign.id}`, "/seller/profile"],
   admin: ["/admin", "/admin/approvals", "/admin/users", "/admin/users?role=BUYER", "/admin/sellers", `/admin/sellers/${sellerProfile.id}`, "/admin/categories", `/admin/categories?edit=${car.categoryId}`, "/admin/listings", "/admin/listings?status=ACTIVE", "/admin/offers", "/admin/orders", "/admin/sales", "/admin/commissions", "/admin/commissions/invoices", "/admin/commissions/rules", "/admin/payouts", "/admin/payments", "/admin/refunds", "/admin/campaigns", `/admin/campaigns/${campaign.id}`, `/admin/campaigns/${due.id}`, "/admin/draws", "/admin/reports", "/admin/cms", "/admin/settings", "/admin/audit", "/admin/messages", "/api/admin/export/payments", "/api/admin/export/commissions", `/api/admin/export/tickets?campaign=${campaign.id}`],
 };
-const cookies = { anon: "", buyer: await session("buyer@selleasy.test"), seller: await session("seller@selleasy.test"), admin: await session("admin@selleasy.test") };
+const cookies = { anon: "", buyer: await session("buyer@sidebooster.test"), seller: await session("seller@sidebooster.test"), admin: await session("admin@sidebooster.test") };
 
 let fail = 0;
 let ok = 0;

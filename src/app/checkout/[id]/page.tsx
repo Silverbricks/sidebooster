@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import crypto from "node:crypto";
@@ -51,7 +52,7 @@ export default async function CheckoutPage({ params, searchParams }: { params: P
             <div><label className="label" htmlFor="shippingAddress">Delivery address</label><textarea id="shippingAddress" name="shippingAddress" rows={3} className="input" required placeholder="Street, suburb, state, postcode" /></div>
             <div><label className="label" htmlFor="notes">Notes for seller (optional)</label><input id="notes" name="notes" className="input" /></div>
             <SubmitButton className="btn-primary w-full">Continue to secure payment · {money(total)}</SubmitButton>
-            <p className="text-xs text-muted">Your order is only confirmed once the payment provider confirms payment. Card details are entered on the payment provider&apos;s page, never stored by SellEasy.</p>
+            <p className="text-xs text-muted">Your order is only confirmed once the payment provider confirms payment. Card details are entered on the payment provider&apos;s page, never stored by {brand.name}.</p>
           </form>
         </div>
         <aside className="card card-pad h-fit space-y-2 text-sm">

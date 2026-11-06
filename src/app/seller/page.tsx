@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -22,7 +23,7 @@ export default async function SellerHome() {
   const checklist: [string, boolean, string][] = [
     ["Email & mobile verified", user.accountStatus === "ACTIVE", "/verify"],
     ["Verification documents submitted", !!sp && !["VERIFICATION_PENDING", "DOCUMENTS_REQUIRED", "REGISTERED"].includes(sp.status), "/seller/verification"],
-    ["Approved by SellEasy", !!sp && ["APPROVED", "ACTIVE"].includes(sp.status), "/seller/verification"],
+    [`Approved by ${brand.name}`, !!sp && ["APPROVED", "ACTIVE"].includes(sp.status), "/seller/verification"],
     ["Payout account verified", !!sp?.paymentAccount?.payoutsEnabled, "/seller/payouts"],
   ];
 

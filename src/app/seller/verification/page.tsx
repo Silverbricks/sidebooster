@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { requireSeller } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dateTime } from "@/lib/format";
@@ -20,7 +21,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
     <div className="space-y-6">
       <PageHeader title="Seller verification" subtitle={<>Status <Badge status={p.status} labels={SELLER_STATUS} /></>} />
       <Flash sp={sp} />
-      {p.statusReason && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm"><b>Message from SellEasy:</b> {p.statusReason}</div>}
+      {p.statusReason && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm"><b>Message from {brand.name}:</b> {p.statusReason}</div>}
       <Section title="Your details">
         <KV rows={[
           ["Seller ID", <span key="i" className="font-mono">{p.sellerCode}</span>],
@@ -34,7 +35,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
       </Section>
       <Section title="Verification documents">
         <p className="mb-4 text-sm text-muted">
-          Required: photo ID (driver licence or passport) and {p.sellerType === "BUSINESS" ? "ABN/ASIC registration (plus an authority letter if you're not a director)" : "proof of address"}. Documents are stored privately and only visible to you and SellEasy compliance staff.
+          Required: photo ID (driver licence or passport) and {p.sellerType === "BUSINESS" ? "ABN/ASIC registration (plus an authority letter if you're not a director)" : "proof of address"}. Documents are stored privately and only visible to you and {brand.name} compliance staff.
           Bank details are verified by our payment provider, not stored here.
         </p>
         {p.documents.length > 0 && (

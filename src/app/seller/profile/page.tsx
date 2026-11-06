@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
 import { Flash, KV, PageHeader, Section } from "@/components/ui";
@@ -23,7 +24,7 @@ export default async function SellerProfile({ searchParams }: { searchParams: Pr
           <SubmitButton>Save</SubmitButton>
         </form>
       </Section>
-      <Section title="Permissions granted by SellEasy">
+      <Section title={`Permissions granted by ${brand.name}`}>
         <KV rows={[["Free-entry campaigns", p.canRunFreeDraws ? "Allowed" : "Not allowed"], ["Paid-ticket campaigns", p.canRunPaidDraws ? "Allowed" : "Not allowed"], ["Trusted seller", p.trustedSeller ? "Yes" : "No"]]} />
         <p className="mt-3 text-xs text-muted">Legal identity details can only be changed by contacting <Link href="/contact" className="link">support</Link>, as they require re-verification.</p>
       </Section>

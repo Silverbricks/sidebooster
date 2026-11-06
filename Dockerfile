@@ -1,4 +1,4 @@
-# SellEasy production image. Works on any Docker host (Railway, Render, Fly.io, a VPS, ECS, …).
+# SideBooster production image. Works on any Docker host (Railway, Render, Fly.io, a VPS, ECS, …).
 # On start it applies database migrations, runs the safe bootstrap (never deletes data), then serves on $PORT.
 
 FROM node:22-bookworm-slim AS base

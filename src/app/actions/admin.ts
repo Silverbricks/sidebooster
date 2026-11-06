@@ -1,4 +1,5 @@
 "use server";
+import { brand } from "@/config/brand";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
@@ -135,7 +136,7 @@ export async function listingDecisionAction(fd: FormData) {
   if (decision === "APPROVE") {
     if (!["APPROVED", "ACTIVE"].includes(l.seller.sellerProfile?.status ?? "") && l.seller.role !== "ADMIN") back(path, { error: "The seller is not approved — listings can't be published." });
     await db.listing.update({ where: { id }, data: { status: "ACTIVE", statusReason: null, publishedAt: l.publishedAt ?? new Date(), expiresAt: new Date(Date.now() + LISTING_DAYS_ACTIVE * 86400_000) } });
-    await notify(l.sellerId, { type: "LISTING_APPROVED", title: `Listing approved: ${l.title}`, body: "Your listing is now live on SellEasy.", link: `/listing/${l.id}` });
+    await notify(l.sellerId, { type: "LISTING_APPROVED", title: `Listing approved: ${l.title}`, body: `Your listing is now live on ${brand.name}.`, link: `/listing/${l.id}` });
   } else if (decision === "REJECT") {
     await db.listing.update({ where: { id }, data: { status: "REJECTED", statusReason: reason } });
     await notify(l.sellerId, { type: "LISTING_REJECTED", title: `Listing not approved: ${l.title}`, body: reason!, link: `/seller/listings/${l.id}` });

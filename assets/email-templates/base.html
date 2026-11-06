@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  SideBooster transactional email layout.
+  Placeholders: {{subject}}, {{body_html}}, {{cta_url}}, {{cta_label}}, {{year}}.
+  Use it when connecting an email provider in src/lib/notify.ts → deliver().
+  The app currently sends the plain-text version of every message (with the SideBooster signature).
+-->
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{subject}}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f3ff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ede9fe;">
+        <tr><td style="background:#6d28d9;padding:20px 28px;">
+          <a href="https://sidebooster.com" style="text-decoration:none;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.3px;">Side<span style="color:#fbbf24;">Booster</span></a>
+          <div style="color:#ddd6fe;font-size:11px;font-weight:700;letter-spacing:3px;margin-top:4px;">SHOP • TICKETS • WIN</div>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <h1 style="margin:0 0 16px;font-size:20px;">{{subject}}</h1>
+          <div style="font-size:15px;line-height:1.6;color:#334155;">{{body_html}}</div>
+          <p style="margin:24px 0 0;"><a href="{{cta_url}}" style="display:inline-block;background:#6d28d9;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;">{{cta_label}}</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 28px;border-top:1px solid #ede9fe;font-size:12px;color:#64748b;line-height:1.5;">
+          Need help? Contact <a href="mailto:support@sidebooster.com" style="color:#6d28d9;">support@sidebooster.com</a>.<br>
+          © {{year}} SideBooster · sidebooster.com · Promotions are subject to their published terms. 18+ only.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

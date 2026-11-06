@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { db } from "./db";
 
 /**
@@ -5,8 +6,8 @@ import { db } from "./db";
  * Super Admin at /admin/settings, so business rules change without code changes.
  */
 export const DEFAULT_SETTINGS = {
-  site_name: "SellEasy",
-  support_email: "support@selleasy.example",
+  site_name: brand.name,
+  support_email: brand.supportEmail,
   default_commission_bps: "500",
   commission_invoice_due_days: "14",
   payment_expiry_minutes: "30",

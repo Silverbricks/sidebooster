@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   to.setUTCMonth(to.getUTCMonth() + 1);
   const sales = await db.sale.findMany({ where: { sellerId: user.id, createdAt: { gte: from, lt: to } }, include: { listing: true, buyer: true, commission: { include: { invoice: true } }, payout: true }, orderBy: { createdAt: "asc" } });
   const rows = [
-    ["SellEasy seller statement", month, user.sellerProfile.sellerCode, user.sellerProfile.legalName],
+    [`${brand.name} seller statement`, month, user.sellerProfile.sellerCode, user.sellerProfile.legalName],
     [],
     ["Date", "Sale", "Source", "Product", "Buyer ID", "Sale price", "Rate %", "Commission", "Commission status", "Invoice", "Net payout", "Payout status"],
     ...sales.map((s) => [

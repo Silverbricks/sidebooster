@@ -31,10 +31,10 @@ const signed = (body: object) => {
 const pay = (paymentId: string, eventId = `evt_${crypto.randomUUID()}`) => handleWebhook(...signed({ eventId, type: "payment.succeeded", paymentId, providerRef: `pi_${crypto.randomUUID()}`, status: "SUCCEEDED", method: "card" }));
 
 async function main() {
-  const buyer = await user("buyer@selleasy.test");
-  const buyer2 = await user("buyer2@selleasy.test");
-  const seller = await user("seller@selleasy.test");
-  const admin = await user("admin@selleasy.test");
+  const buyer = await user("buyer@sidebooster.test");
+  const buyer2 = await user("buyer2@sidebooster.test");
+  const seller = await user("seller@sidebooster.test");
+  const admin = await user("admin@sidebooster.test");
 
   console.log("Tickets & draws");
   const open = await db.campaign.findUniqueOrThrow({ where: { slug: "win-a-dell-xps-15" } });

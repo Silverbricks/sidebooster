@@ -7,16 +7,16 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-selleasy}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-selleasy}
-      POSTGRES_DB: ${POSTGRES_DB:-selleasy}
+      POSTGRES_USER: ${POSTGRES_USER:-sidebooster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sidebooster}
+      POSTGRES_DB: ${POSTGRES_DB:-sidebooster}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-selleasy}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sidebooster}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     env_file: .env.production
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-selleasy}:${POSTGRES_PASSWORD:-selleasy}@db:5432/${POSTGRES_DB:-selleasy}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sidebooster}:${POSTGRES_PASSWORD:-sidebooster}@db:5432/${POSTGRES_DB:-sidebooster}
     depends_on:
       db:
         condition: service_healthy

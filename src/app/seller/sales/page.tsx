@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { requireSeller } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { money, dateTime } from "@/lib/format";
@@ -21,7 +22,7 @@ export default async function SellerSales({ searchParams }: { searchParams: Prom
       <PageHeader title="Completed sales" subtitle="Commission is only calculated on approved, completed sales." />
       <Flash sp={sp} />
       <Section title="Report a sale arranged directly with a buyer">
-        <p className="mb-3 text-sm text-muted">For cars, property and other enquiry-based sales. The buyer confirms the sale in their account, then SellEasy reviews it and issues a commission invoice.</p>
+        <p className="mb-3 text-sm text-muted">For cars, property and other enquiry-based sales. The buyer confirms the sale in their account, then {brand.name} reviews it and issues a commission invoice.</p>
         {reportable.length ? (
           <form action={reportSaleAction} className="grid gap-3 sm:grid-cols-2">
             <div><label className="label" htmlFor="listingId">Product</label>

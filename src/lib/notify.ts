@@ -1,4 +1,5 @@
 import { db, type Tx } from "./db";
+import { brand } from "@/config/brand";
 
 /**
  * In-app notification + email. Messages are written to MessageLog (viewable at /admin/messages)
@@ -17,6 +18,10 @@ export async function notify(
 }
 
 export async function sendEmail(to: string, subject: string, body: string, tx: Tx = db) {
+  body = `${body}
+
+— The ${brand.name} team · ${brand.tagline}
+${brand.domain} · ${brand.supportEmail}`;
   await tx.messageLog.create({ data: { channel: "EMAIL", to, subject, body } });
   deliver("EMAIL", to, subject, body);
 }

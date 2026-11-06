@@ -1,4 +1,4 @@
-# SellEasy — Admin guide
+# SideBooster — Admin guide
 
 > **Security:** never commit real passwords, API keys or the `.env` file to git. Real credentials belong in your hosting provider's environment variables and in a password manager.
 
@@ -8,11 +8,11 @@ These are created by `npm run setup` / `npm run db:seed`. The demo seed **wipes 
 
 | Role | Email | Password | Platform ID |
 |---|---|---|---|
-| Super Admin | `admin@selleasy.test` | `Password123` | ADM-000001 |
-| Seller (active, free draws allowed) | `seller@selleasy.test` | `Password123` | SEL-000001 |
-| Business seller (under review) | `business@selleasy.test` | `Password123` | BUS-000001 |
-| Buyer (QLD) | `buyer@selleasy.test` | `Password123` | BUY-000001 |
-| Buyer (NSW) | `buyer2@selleasy.test` | `Password123` | BUY-000002 |
+| Super Admin | `admin@sidebooster.test` | `Password123` | ADM-000001 |
+| Seller (active, free draws allowed) | `seller@sidebooster.test` | `Password123` | SEL-000001 |
+| Business seller (under review) | `business@sidebooster.test` | `Password123` | BUS-000001 |
+| Buyer (QLD) | `buyer@sidebooster.test` | `Password123` | BUY-000001 |
+| Buyer (NSW) | `buyer2@sidebooster.test` | `Password123` | BUY-000002 |
 
 Admin login: `http://localhost:3000/login` → then `/admin`.
 

@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { requireSeller } from "@/lib/auth";
 import { CampaignForm } from "@/components/CampaignForm";
 import { Flash, PageHeader } from "@/components/ui";
@@ -14,7 +15,7 @@ export default async function NewCampaign({ searchParams }: { searchParams: Prom
       <PageHeader title="Request a promotion campaign" subtitle="Campaigns go through compliance review and admin approval before publishing. Dates you enter are proposals." />
       <Flash sp={sp} />
       <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        Trade promotions and lotteries are regulated differently in each Australian state and territory. Some states (e.g. VIC, NSW) require trade promotions to be free to enter, and permits may be needed above certain prize values. SellEasy will not publish a campaign until its structure has been reviewed.
+        Trade promotions and lotteries are regulated differently in each Australian state and territory. Some states (e.g. VIC, NSW) require trade promotions to be free to enter, and permits may be needed above certain prize values. {brand.name} will not publish a campaign until its structure has been reviewed.
       </div>
       <CampaignForm action={saveCampaignAction} defaultListing={sp.listing} {...await campaignFormProps(user)} />
     </div>

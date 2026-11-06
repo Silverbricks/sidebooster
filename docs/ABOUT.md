@@ -1,6 +1,6 @@
-# About SellEasy
+# About SideBooster
 
-SellEasy is a **verified Australian online marketplace with approved prize promotions**.
+SideBooster is a **verified Australian online marketplace with approved prize promotions**.
 
 - **Buyers** browse and buy products, send enquiries, keep a wishlist, and claim or buy tickets for prize draws, all from one account.
 - **Sellers** are identity-checked and approved before they can sell. Each listing is also reviewed before it goes live. Approved sellers can, with admin permission, run prize promotions linked to their products.

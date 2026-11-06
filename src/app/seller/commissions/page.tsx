@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { requireSeller } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { money, date } from "@/lib/format";
@@ -25,7 +26,7 @@ export default async function SellerCommissions() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Payments & commission" subtitle="Rates are set by SellEasy and agreed in your seller agreement. Invoices are marked paid by SellEasy once payment is reconciled." />
+      <PageHeader title="Payments & commission" subtitle={`Rates are set by ${brand.name} and agreed in your seller agreement. Invoices are marked paid by ${brand.name} once payment is reconciled.`} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Commission generated" value={money(sum(["GENERATED", "INVOICED", "PAID", "OVERDUE"]))} />
         <Stat label="Commission paid" value={money(sum(["PAID"]) + payouts.filter((p) => p.status === "PAID").reduce((a, p) => a + p.commission, 0))} />

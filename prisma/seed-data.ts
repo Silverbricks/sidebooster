@@ -95,8 +95,8 @@ export const CATEGORIES: Cat[] = [
 ];
 
 export const PAGES: [string, string, string][] = [
-  ["about", "About Us", "SellEasy is an Australian verified marketplace. Every seller is identity-checked and every listing is reviewed before it goes live.\n\nWe also host approved prize promotions run by verified sellers, with fully auditable draws."],
-  ["contact", "Contact Us", "Email: support@selleasy.example\nPhone: 1300 000 000 (Mon–Fri, 9am–5pm AEST)\n\nOr use the form below."],
+  ["about", "About SideBooster", "SideBooster — Shop • Tickets • Win.\n\nSideBooster is an Australian online marketplace where verified sellers list products and customers can shop, enter scheduled prize draws and win. Every seller is identity-checked and every listing is reviewed before it goes live.\n\nWe sell cars and motor vehicles, property and real estate, mobile phones and electronics, luxury products, home and lifestyle items and general merchandise — and every prize draw is run with a published, verifiable method."],
+  ["contact", "Contact Us", "Email: support@sidebooster.com\nPhone: 1300 000 000 (Mon–Fri, 9am–5pm AEST)\n\nOr use the form below."],
   ["terms", "Terms & Conditions", "PLACEHOLDER — these terms must be drafted and reviewed by an Australian lawyer before launch.\n\n1. Accounts\n2. Seller obligations\n3. Listings and approval\n4. Payments, fees and commission\n5. Promotions and draws\n6. Liability\n7. Governing law: the laws of the state in which the operator is registered."],
   ["privacy", "Privacy Policy", "PLACEHOLDER — must comply with the Privacy Act 1988 (Cth) and the Australian Privacy Principles. Describe what personal information is collected (identity, contact, verification documents, payment references), why, how it is stored and protected, and how users can access or correct it."],
   ["refund-policy", "Refund Policy", "PLACEHOLDER — must reflect Australian Consumer Law guarantees.\n\nProduct orders: request a refund from your order page; the platform reviews every request.\nTicket purchases: refundable until ticket sales close and the entry register is locked, or if a campaign is cancelled."],

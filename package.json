@@ -1,5 +1,5 @@
 {
-  "name": "selleasy",
+  "name": "sidebooster",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -16,7 +16,7 @@
     "bootstrap": "tsx prisma/bootstrap.ts",
     "start:prod": "prisma migrate deploy && tsx prisma/bootstrap.ts && next start",
     "typecheck": "tsc --noEmit",
-    "test:flows": "sh -c \"export DATABASE_URL=${TEST_DATABASE_URL:-postgresql://selleasy:selleasy@localhost:5432/selleasy_test} && prisma migrate deploy >/dev/null && tsx prisma/seed.ts >/dev/null && tsx --conditions=react-server scripts/test-flows.ts\"",
+    "test:flows": "sh -c \"export DATABASE_URL=${TEST_DATABASE_URL:-postgresql://sidebooster:sidebooster@localhost:5432/sidebooster_test} && prisma migrate deploy >/dev/null && tsx prisma/seed.ts >/dev/null && tsx --conditions=react-server scripts/test-flows.ts\"",
     "test:smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

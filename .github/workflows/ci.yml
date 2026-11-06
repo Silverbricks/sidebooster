@@ -12,15 +12,15 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: selleasy
-          POSTGRES_PASSWORD: selleasy
-          POSTGRES_DB: selleasy_test
+          POSTGRES_USER: sidebooster
+          POSTGRES_PASSWORD: sidebooster
+          POSTGRES_DB: sidebooster_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U selleasy" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U sidebooster" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://selleasy:selleasy@localhost:5432/selleasy_test
-      TEST_DATABASE_URL: postgresql://selleasy:selleasy@localhost:5432/selleasy_test
+      DATABASE_URL: postgresql://sidebooster:sidebooster@localhost:5432/sidebooster_test
+      TEST_DATABASE_URL: postgresql://sidebooster:sidebooster@localhost:5432/sidebooster_test
       ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       CRON_SECRET: ci-secret
       APP_URL: http://localhost:3000
@@ -42,4 +42,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t selleasy:ci .
+      - run: docker build -t sidebooster:ci .

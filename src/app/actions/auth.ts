@@ -1,4 +1,5 @@
 "use server";
+import { brand } from "@/config/brand";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createSession, destroySession, getCurrentUser, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
@@ -50,7 +51,7 @@ async function assertUnique(email: string, mobile: string, path: string) {
 async function sendVerificationEmail(userId: string, email: string) {
   const token = randomToken();
   await db.user.update({ where: { id: userId }, data: { emailVerifyToken: token } });
-  await sendEmail(email, "Verify your SellEasy email", `Welcome to SellEasy!\n\nVerify your email address:\n${appUrl(`/verify-email?token=${token}`)}`);
+  await sendEmail(email, `Verify your ${brand.name} email`, `Welcome to ${brand.name}!\n\nVerify your email address:\n${appUrl(`/verify-email?token=${token}`)}`);
 }
 
 export async function registerBuyerAction(fd: FormData) {

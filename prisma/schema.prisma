@@ -1,4 +1,4 @@
-// SellEasy — Verified Marketplace & Promotions Platform
+// SideBooster — Verified Marketplace & Promotions Platform
 // PostgreSQL (local: docker compose up -d db). Migrations live in prisma/migrations.
 // Money is stored as integer cents (AUD); rates as basis points (1% = 100 bps).
 // Status values are strings; allowed values are documented in src/lib/constants.ts.

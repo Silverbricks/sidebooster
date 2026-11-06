@@ -1,3 +1,4 @@
+import { brand } from "@/config/brand";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -22,7 +23,7 @@ export default async function TestGatewayPage({ params }: { params: Promise<{ id
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="bg-slate-900 px-6 py-4 text-white">
           <div className="text-xs uppercase tracking-widest text-amber-300">Test mode · simulated gateway</div>
-          <div className="mt-1 text-sm text-slate-300">Paying SellEasy {p.ledger === "TICKET" ? "(promotions account)" : ""}</div>
+          <div className="mt-1 text-sm text-slate-300">Paying {brand.name} {p.ledger === "TICKET" ? "(promotions account)" : ""}</div>
           <div className="text-3xl font-bold">{money(p.amount)}</div>
         </div>
         <div className="space-y-4 p-6">

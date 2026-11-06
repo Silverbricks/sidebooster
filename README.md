@@ -1,4 +1,8 @@
-# SellEasy — Verified Marketplace & Promotions Platform
+# SideBooster — Shop • Tickets • Win
+
+<img src="assets/logos/sidebooster-logo.svg" alt="SideBooster" width="320">
+
+Product marketplace and prize draw platform · https://sidebooster.com
 
 A verified Australian marketplace where approved sellers list products and, with permission, run approved prize promotions. Buyers purchase products, claim or buy tickets, and check verifiable draw results, all from one account.
 
@@ -18,15 +22,17 @@ npm run dev            # http://localhost:3000
 
 **Docs:** [About](docs/ABOUT.md) · [All URLs](docs/URLS.md) · [Admin guide & logins](docs/ADMIN.md) · [Deploying](DEPLOY.md)
 
+**Brand:** [guidelines](docs/branding/brand-guidelines.md) · [logo](docs/branding/logo-specification.md) · **Requirements:** [overview](docs/requirements/platform-overview.md) · [sellers](docs/requirements/seller-management.md) · [tickets](docs/requirements/ticket-management.md) · [coupons](docs/requirements/coupon-management.md) · [draw engine](docs/requirements/prize-draw-engine.md) · [payments](docs/requirements/payment-management.md) · **Technical:** [architecture](docs/technical/architecture.md) · [database](docs/technical/database-schema.md) · [API](docs/technical/api-documentation.md) · [domains](docs/technical/deployment.md) · [rebranding record](docs/change-management/software-rebranding.md)
+
 Demo logins (password `Password123`):
 
 | Email | ID | Role |
 |---|---|---|
-| admin@selleasy.test | ADM-000001 | Super Admin |
-| seller@selleasy.test | SEL-000001 | Active individual seller (free draws allowed) |
-| business@selleasy.test | BUS-000001 | Business seller, under review |
-| buyer@selleasy.test | BUY-000001 | Verified buyer (QLD) |
-| buyer2@selleasy.test | BUY-000002 | Verified buyer (NSW) |
+| admin@sidebooster.test | ADM-000001 | Super Admin |
+| seller@sidebooster.test | SEL-000001 | Active individual seller (free draws allowed) |
+| business@sidebooster.test | BUS-000001 | Business seller, under review |
+| buyer@sidebooster.test | BUY-000001 | Verified buyer (QLD) |
+| buyer2@sidebooster.test | BUY-000002 | Verified buyer (NSW) |
 
 The demo includes a campaign whose draw time has already passed. Log in as admin, go to **Draw management**, and follow lock → run draw → verify & publish.
 
@@ -42,7 +48,7 @@ Emails and SMS codes (including registration OTPs) are not sent in development. 
 | `npm run db:migrate` | Create a new migration after editing `schema.prisma` |
 | `npm run bootstrap` | Production-safe: default categories/pages + first admin (never deletes) |
 | `npm run db:seed` | Re-seed demo data. **Wipes all data**; refuses to run when `NODE_ENV=production` |
-| `npm run test:flows` | 21 business-rule tests against the separate `selleasy_test` database (`TEST_DATABASE_URL`) |
+| `npm run test:flows` | 21 business-rule tests against the separate `sidebooster_test` database (`TEST_DATABASE_URL`) |
 | `npm run test:smoke` | GETs every page as each role against a running server on :3100 and checks access control |
 | `npm run typecheck` / `lint` | Static checks |
 

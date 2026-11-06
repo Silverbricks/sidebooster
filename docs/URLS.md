@@ -1,4 +1,4 @@
-# SellEasy — URL map
+# SideBooster — URL map
 
 Replace `https://your-domain.com.au` with your live domain, or `http://localhost:3000` when developing locally.
 
