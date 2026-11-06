@@ -20,7 +20,7 @@ npm run setup          # apply migrations + load demo data
 npm run dev            # http://localhost:3000
 ```
 
-**Docs:** [About](docs/ABOUT.md) · [All URLs](docs/URLS.md) · [Admin guide & logins](docs/ADMIN.md) · [Deploying](DEPLOY.md)
+**Docs:** [About](docs/ABOUT.md) · [All URLs](docs/URLS.md) · [Admin guide & logins](docs/ADMIN.md) · [Deploying](DEPLOY.md) · [**Hosting on Hostinger**](docs/HOSTINGER.md)
 
 **Brand:** [guidelines](docs/branding/brand-guidelines.md) · [logo](docs/branding/logo-specification.md) · **Requirements:** [overview](docs/requirements/platform-overview.md) · [sellers](docs/requirements/seller-management.md) · [tickets](docs/requirements/ticket-management.md) · [coupons](docs/requirements/coupon-management.md) · [draw engine](docs/requirements/prize-draw-engine.md) · [payments](docs/requirements/payment-management.md) · **Technical:** [architecture](docs/technical/architecture.md) · [database](docs/technical/database-schema.md) · [API](docs/technical/api-documentation.md) · [domains](docs/technical/deployment.md) · [rebranding record](docs/change-management/software-rebranding.md)
 

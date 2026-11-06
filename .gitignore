@@ -48,3 +48,4 @@ prisma/*.db-journal
 .env
 !.env.example
 /private-uploads
+!.env.production.example

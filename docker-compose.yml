@@ -1,6 +1,8 @@
 # Local development:   docker compose up -d db            (PostgreSQL only; run the app with `npm run dev`)
-# Full stack / VPS:    docker compose --profile app up -d --build
-#   Requires a .env.production file next to this one (copy .env.example and fill it in).
+# Server (VPS, e.g. Hostinger KVM):
+#   cp .env.production.example .env.production   # fill it in
+#   docker compose --env-file .env.production --profile app up -d --build
+# This starts PostgreSQL, the app, the 5-minute cron caller and Caddy (automatic HTTPS for $DOMAIN).
 
 services:
   db:
@@ -31,8 +33,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # only reachable from this server; the public reaches it through Caddy (HTTPS)
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - appdata:/data
 
@@ -45,6 +48,25 @@ services:
     depends_on: [app]
     entrypoint: ["/bin/sh", "-c", "while true; do sleep 300; curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/tick || true; echo; done"]
 
+  # HTTPS reverse proxy. Gets and renews Let's Encrypt certificates for $DOMAIN and www.$DOMAIN automatically.
+  caddy:
+    profiles: ["app"]
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [app]
+
 volumes:
   pgdata:
   appdata:
+  caddydata:
+  caddyconfig:

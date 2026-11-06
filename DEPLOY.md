@@ -50,31 +50,22 @@ The server refuses to start in production if `DATABASE_URL`, `APP_URL`, `CRON_SE
    A free alternative is a GitHub Actions scheduled workflow, or cron-job.org with the same header.
 10. Remove `ADMIN_PASSWORD` from the variables and redeploy.
 
-## 2b. Option B: your own VPS (Docker Compose)
+## 2b. Option B: your own VPS (Hostinger KVM, DigitalOcean, …)
 
-On an Ubuntu server with Docker installed:
+**Hostinger:** follow the step-by-step guide in [docs/HOSTINGER.md](docs/HOSTINGER.md).
+
+On any Ubuntu server with Docker:
 
 ```bash
 git clone <your-repo-url> sidebooster && cd sidebooster
-cp .env.example .env.production      # fill in step-1 values; DATABASE_URL is set by compose
-export POSTGRES_PASSWORD='<strong password>'
-docker compose --profile app up -d --build
-docker compose logs -f app            # look for "Created Super Admin"
+cp .env.production.example .env.production   # fill in every value
+docker compose --env-file .env.production --profile app up -d --build
+docker compose --env-file .env.production logs -f app   # look for "Created Super Admin"
 ```
 
-This runs Postgres, the app on port 3000 and the 5-minute cron caller. Put **Caddy** or nginx in front for HTTPS:
+This runs Postgres, the app, the 5-minute cron caller and **Caddy**. Caddy serves `https://$DOMAIN`, redirects `www`, and gets its certificates automatically (config: `deploy/Caddyfile`). Ports 80 and 443 must be open, and the domain must point at the server first.
 
-```
-# /etc/caddy/Caddyfile
-your-domain.com.au {
-  reverse_proxy 127.0.0.1:3000
-  request_body {
-    max_size 120MB
-  }
-}
-```
-
-To update: `git pull && docker compose --profile app up -d --build`.
+To update: `git pull && docker compose --env-file .env.production --profile app up -d --build`.
 
 ## 3. Backups (required)
 
