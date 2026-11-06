@@ -33,7 +33,15 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm run test:flows
+      - name: Business-rule tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:flows 2>&1 | tee test-output.txt || {
+            # surface the failure in the run summary (annotations), not only in the raw log
+            echo "::error title=test:flows failed::$(tail -c 3500 test-output.txt | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          }
       - name: Check migrations match schema
         run: npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
       - run: npm run build
