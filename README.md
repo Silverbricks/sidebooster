@@ -16,7 +16,7 @@ npm run setup          # apply migrations + load demo data
 npm run dev            # http://localhost:3000
 ```
 
-**Deploying?** See [DEPLOY.md](DEPLOY.md).
+**Docs:** [About](docs/ABOUT.md) · [All URLs](docs/URLS.md) · [Admin guide & logins](docs/ADMIN.md) · [Deploying](DEPLOY.md)
 
 Demo logins (password `Password123`):
 
