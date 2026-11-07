@@ -203,7 +203,7 @@ Database migrations run automatically on start.
 | Restart the app | `docker compose restart app` |
 | Stop everything | `docker compose down` (data is kept) |
 | Database shell | `docker compose exec db psql -U sidebooster sidebooster` |
-| Run the cron job now | `curl -H "Authorization: Bearer $(grep ^CRON_SECRET .env.production \| cut -d= -f2)" http://127.0.0.1:3000/api/cron/tick` |
+| Run the cron job now | `curl -H "Authorization: Bearer $(grep ^CRON_SECRET .env.production \| cut -d= -f2)" http://127.0.0.1:${APP_HOST_PORT:-3000}/api/cron/tick` |
 
 ## Troubleshooting
 
@@ -213,6 +213,7 @@ Database migrations run automatically on start.
 | `502 Bad Gateway` | The app is still starting or has crashed. Check `docker compose logs app` |
 | App log says `Refusing to start — fix the environment` | A setting in `.env.production` is missing or wrong (the message says which). Fix it, then run `docker compose up -d` |
 | `failed to bind host port ... address already in use` (5432) | Another PostgreSQL is already on the server. Set `DB_HOST_PORT=5433` in `.env.production`, then `docker compose up -d` |
+| `failed to bind host port 127.0.0.1:3000` | Another app uses port 3000. Set `APP_HOST_PORT=3001` in `.env.production`, then `docker compose up -d` |
 | `failed to bind host port ... 0.0.0.0:80` or `:443` | Another web server (nginx/apache) holds the port: `systemctl disable --now nginx apache2`, then `docker compose up -d` |
 | Build stops with "killed" or out of memory | Use KVM 2, or add swap: `fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile` |
 | Forgot the admin password | See [ADMIN.md §6](ADMIN.md) |
