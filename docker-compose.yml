@@ -13,7 +13,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sidebooster}
       POSTGRES_DB: ${POSTGRES_DB:-sidebooster}
     ports:
-      - "127.0.0.1:5432:5432"
+      # host port only for local tools; set DB_HOST_PORT if 5432 is taken (e.g. a preinstalled PostgreSQL on the VPS)
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
