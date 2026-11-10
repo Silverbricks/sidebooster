@@ -5,7 +5,10 @@ import { updateProfileAction } from "@/app/actions/account";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Badge, Flash, KV, PageHeader, Section, Stat } from "@/components/ui";
 import { ACCOUNT_STATUS, AU_STATES, SELLER_STATUS } from "@/lib/constants";
-import { date } from "@/lib/format";
+import { date, money } from "@/lib/format";
+import { ORDER_STATUS } from "@/lib/constants";
+import { productPath } from "@/lib/urls";
+import { ActionList, QuickLinks, RecentList } from "@/components/dashboard";
 import { formatDob } from "@/lib/au-validation";
 
 export const metadata = { title: "My account" };
@@ -13,21 +16,59 @@ export const metadata = { title: "My account" };
 export default async function AccountPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const [orders, tickets, wins] = await Promise.all([
+  const [orders, tickets, wins, spent, toConfirm, unread, replies, awaitingPay, recentOrders, wishlist, saved] = await Promise.all([
     db.order.count({ where: { buyerId: user.id } }),
     db.ticket.count({ where: { buyerId: user.id, status: "VALID" } }),
     db.drawResult.count({ where: { winnerUserId: user.id, status: "PUBLISHED" } }),
+    db.order.aggregate({ where: { buyerId: user.id, status: { in: ["PAID", "FULFILLED", "COMPLETED"] } }, _sum: { total: true } }),
+    db.sale.count({ where: { buyerId: user.id, status: "REPORTED" } }),
+    db.notification.count({ where: { userId: user.id, readAt: null } }),
+    db.enquiry.count({ where: { buyerId: user.id, status: "REPLIED", repliedAt: { gte: new Date(Date.now() - 14 * 86_400_000) } } }),
+    db.order.count({ where: { buyerId: user.id, status: "PENDING_PAYMENT" } }),
+    db.order.findMany({ where: { buyerId: user.id }, orderBy: { createdAt: "desc" }, take: 5, include: { items: { take: 1 }, seller: { select: { name: true, sellerProfile: { select: { businessName: true } } } } } }),
+    db.wishlistItem.findMany({ where: { userId: user.id, listing: { status: "ACTIVE" } }, orderBy: { createdAt: "desc" }, take: 5, include: { listing: { select: { id: true, slug: true, title: true, price: true, location: true } } } }),
+    db.wishlistItem.count({ where: { userId: user.id, listing: { status: "ACTIVE" } } }),
   ]);
+  const verified = user.accountStatus === "ACTIVE";
   const check = (ok: unknown) => (ok ? <Badge status="ACTIVE">Verified</Badge> : <Badge status="PENDING">Pending</Badge>);
 
   return (
     <div className="space-y-6">
       <PageHeader title={`Hi ${user.firstName}`} subtitle={<>Buyer ID <span className="font-mono font-semibold">{user.publicId}</span></>} />
       <Flash sp={sp} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Orders" value={orders} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Orders" value={orders} sub={`${money(spent._sum.total ?? 0)} spent`} />
+        <Stat label="Wishlist" value={saved} sub="live items saved" />
         <Stat label="Active tickets" value={tickets} />
         <Stat label="Wins" value={wins} />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section title="Needs your attention">
+          <ActionList items={[
+            { label: "Finish verifying your account", count: verified ? 0 : 1, href: "/verify", hint: "Needed before you can buy or enter promotions" },
+            { label: "Orders awaiting payment", count: awaitingPay, href: "/account/orders" },
+            { label: "Purchases to confirm", count: toConfirm, href: "/account/sales", hint: "A seller recorded a sale to you — confirm or dispute it" },
+            { label: "New replies from sellers", count: replies, href: "/account/enquiries", tone: "info" },
+            { label: "Unread notifications", count: unread, href: "/account/notifications", tone: "info" },
+          ]} />
+        </Section>
+        <Section title="Quick links">
+          <QuickLinks links={[["Browse marketplace", "/marketplace"], ["My orders", "/account/orders"], ["Wishlist", "/account/wishlist"], ["My tickets", "/account/tickets"], ["Payments & refunds", "/account/payments"], ...(user.sellerProfile ? [["Seller dashboard", "/seller"] as [string, string]] : [["Start selling", "/register/seller"] as [string, string]])]} />
+        </Section>
+        <Section title="Recent orders" actions={<Link href="/account/orders" className="link text-sm">All orders →</Link>}>
+          <RecentList empty="No orders yet." rows={recentOrders.map((o) => ({
+            key: o.id, href: `/account/orders/${o.id}`,
+            title: o.items[0]?.title ?? o.orderNumber,
+            meta: <>{o.orderNumber} · {o.seller.sellerProfile?.businessName ?? o.seller.name} · {date(o.createdAt)}</>,
+            right: <><div className="font-semibold tabular-nums">{money(o.total)}</div><Badge status={o.status} labels={ORDER_STATUS} /></>,
+          }))} />
+        </Section>
+        <Section title="Saved items" actions={<Link href="/account/wishlist" className="link text-sm">Wishlist →</Link>}>
+          <RecentList empty="Tap ♡ on a product to save it here." rows={wishlist.map((w) => ({
+            key: w.listing.id, href: productPath(w.listing), title: w.listing.title, meta: w.listing.location,
+            right: <span className="font-semibold tabular-nums">{money(w.listing.price)}</span>,
+          }))} />
+        </Section>
       </div>
       <Section title="Verification" actions={user.accountStatus !== "ACTIVE" ? <Link href="/verify" className="btn-primary btn-sm">Complete verification</Link> : undefined}>
         <KV rows={[
