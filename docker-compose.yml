@@ -1,7 +1,7 @@
 # Local development:   docker compose up -d db            (PostgreSQL only; run the app with `npm run dev`)
 # Server (VPS, e.g. Hostinger KVM):
 #   cp .env.production.example .env.production   # fill it in
-#   docker compose --env-file .env.production --profile app up -d --build
+#   docker compose --env-file .env.production --profile app --profile caddy up -d --build
 # This starts PostgreSQL, the app, the 5-minute cron caller and Caddy (automatic HTTPS for $DOMAIN).
 
 services:
@@ -50,8 +50,10 @@ services:
     entrypoint: ["/bin/sh", "-c", "while true; do sleep 300; curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/tick || true; echo; done"]
 
   # HTTPS reverse proxy. Gets and renews Let's Encrypt certificates for $DOMAIN and www.$DOMAIN automatically.
+  # Started only with the "caddy" profile (COMPOSE_PROFILES=app,caddy). If the server already runs nginx for
+  # other sites, use COMPOSE_PROFILES=app and deploy/nginx-sidebooster.conf instead.
   caddy:
-    profiles: ["app"]
+    profiles: ["caddy"]
     image: caddy:2.8-alpine
     restart: unless-stopped
     environment:

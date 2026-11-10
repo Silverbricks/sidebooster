@@ -221,3 +221,19 @@ Database migrations run automatically on start.
 ## Email for @sidebooster.com
 
 **Hostinger Email** (or Google Workspace or Microsoft 365) can provide `support@sidebooster.com`. Add the MX, SPF, DKIM and DMARC records it gives you in the same DNS zone as step 3; they don't affect the website records. Sending the app's own emails (verification codes, receipts) needs a transactional email service connected in `src/lib/notify.ts`.
+
+## Using nginx instead of Caddy (when the server also hosts other websites)
+
+Only one program can use ports 80 and 443. If nginx already serves other sites, let nginx serve SideBooster too:
+
+1. In `.env.production`, set `COMPOSE_PROFILES=app`, so the built-in Caddy proxy doesn't start. Then run `docker compose up -d`.
+2. Set up the nginx site and its certificate:
+   ```bash
+   cp deploy/nginx-sidebooster.conf /etc/nginx/sites-available/sidebooster.com
+   ln -sf /etc/nginx/sites-available/sidebooster.com /etc/nginx/sites-enabled/sidebooster.com
+   nginx -t && systemctl reload nginx
+   certbot --nginx -d sidebooster.com -d www.sidebooster.com
+   ```
+3. If the domain uses **Cloudflare** DNS with the orange-cloud proxy, set **SSL/TLS → Full (strict)**.
+
+`proxy_pass` uses port 3001, which matches `APP_HOST_PORT`. Change both if you use a different port.
