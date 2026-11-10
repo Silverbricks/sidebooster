@@ -4,6 +4,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { brand } from "@/config/brand";
+import { FirebaseAnalytics } from "@/components/FirebaseAnalytics";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <FirebaseAnalytics />
       </body>
     </html>
   );

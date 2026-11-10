@@ -51,3 +51,13 @@ Keep two separate deployments, each with its own database, volume and secrets:
 | Data | test data only | real data, daily backups |
 
 Never point staging at the production database.
+
+## Firebase Analytics
+
+- Project `sidebooster-2a402`. The web config is in `src/config/firebase.ts`. It is public by design, so it is not a secret.
+- `src/components/FirebaseAnalytics.tsx` is mounted in the root layout. It sends a `page_view` for each route, with these limits:
+  - only on `sidebooster.com`;
+  - never for `/admin`, `/account`, `/seller`, `/pay` or `/verify*`.
+- The SDK is lazy-loaded through `src/lib/firebase.ts`. Use `track(name, params)` for custom events.
+- Restrict the API key to `sidebooster.com` and `*.sidebooster.com` in Google Cloud Console → APIs & Services → Credentials.
+- Mention Google Analytics in the Privacy Policy.
