@@ -5,6 +5,7 @@ import { dateTime } from "@/lib/format";
 import { Empty, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { markAllReadAction } from "@/app/actions/account";
+import { PushToggle } from "@/components/PushToggle";
 
 export const metadata = { title: "Notifications" };
 
@@ -14,6 +15,7 @@ export default async function NotificationsPage() {
   return (
     <div>
       <PageHeader title="Notifications" actions={<form action={markAllReadAction}><SubmitButton className="btn-secondary btn-sm">Mark all read</SubmitButton></form>} />
+      <div className="mb-4"><PushToggle /></div>
       {items.length ? (
         <ul className="card divide-y divide-line">
           {items.map((n) => (

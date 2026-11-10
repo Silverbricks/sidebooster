@@ -1,5 +1,6 @@
 import { db, type Tx } from "./db";
 import { brand } from "@/config/brand";
+import { schedulePush } from "./push";
 
 /**
  * In-app notification + email. Messages are written to MessageLog (viewable at /admin/messages)
@@ -10,7 +11,8 @@ export async function notify(
   n: { type: string; title: string; body: string; link?: string; email?: boolean },
   tx: Tx = db,
 ) {
-  await tx.notification.create({ data: { userId, type: n.type, title: n.title, body: n.body, link: n.link } });
+  const created = await tx.notification.create({ data: { userId, type: n.type, title: n.title, body: n.body, link: n.link } });
+  schedulePush(created.id);
   if (n.email !== false) {
     const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (user) await sendEmail(user.email, n.title, n.body + (n.link ? `\n\n${appUrl(n.link)}` : ""), tx);

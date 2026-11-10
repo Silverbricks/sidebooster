@@ -67,6 +67,7 @@ model User {
   salesAsBuyer    Sale[]           @relation("SaleBuyer")
   salesAsSeller   Sale[]           @relation("SaleSeller")
   wishlist        WishlistItem[]
+  pushTokens      PushToken[]
 }
 
 model Session {
@@ -79,32 +80,32 @@ model Session {
 }
 
 model SellerProfile {
-  id                   String           @id @default(cuid())
-  userId               String           @unique
-  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sellerCode           String           @unique // SEL-000001 (individual) / BUS-000001 (business)
-  sellerType           String           @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
-  legalName            String
-  businessName         String?
-  abn                  String?
-  acn                  String?
-  authorisedRep        String?
-  address              String
-  state                String?
-  postcode             String?
-  bio                  String?
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerCode      String           @unique // SEL-000001 (individual) / BUS-000001 (business)
+  sellerType      String           @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
+  legalName       String
+  businessName    String?
+  abn             String?
+  acn             String?
+  authorisedRep   String?
+  address         String
+  state           String?
+  postcode        String?
+  bio             String?
   // REGISTERED | VERIFICATION_PENDING | DOCUMENTS_REQUIRED | UNDER_REVIEW | APPROVED | ACTIVE | SUSPENDED | REJECTED | CLOSED
-  status               String           @default("VERIFICATION_PENDING")
-  statusReason         String?
-  approvedById         String?
-  approvedAt           DateTime?
-  trustedSeller        Boolean          @default(false) // listings auto-approve if the approval rule allows it
-  canRunFreeDraws      Boolean          @default(false)
-  canRunPaidDraws      Boolean          @default(false)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  documents            SellerDocument[]
-  paymentAccount       PaymentAccount?
+  status          String           @default("VERIFICATION_PENDING")
+  statusReason    String?
+  approvedById    String?
+  approvedAt      DateTime?
+  trustedSeller   Boolean          @default(false) // listings auto-approve if the approval rule allows it
+  canRunFreeDraws Boolean          @default(false)
+  canRunPaidDraws Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  documents       SellerDocument[]
+  paymentAccount  PaymentAccount?
 }
 
 model SellerDocument {
@@ -137,21 +138,21 @@ model PaymentAccount {
 // ---------------------------------------------------------------- catalogue
 
 model Category {
-  id            String              @id @default(cuid())
-  name          String
-  slug          String              @unique
-  icon          String?
-  parentId      String?
-  parent        Category?           @relation("CategoryTree", fields: [parentId], references: [id])
-  children      Category[]          @relation("CategoryTree")
-  sortOrder     Int                 @default(0)
-  active        Boolean             @default(true)
-  highValue     Boolean             @default(false) // cars/property: enquiry + reported sale, no online checkout
-  listings      Listing[]           @relation("ListingCategory")
-  subListings   Listing[]           @relation("ListingSubcategory")
-  attributes    CategoryAttribute[]
+  id              String              @id @default(cuid())
+  name            String
+  slug            String              @unique
+  icon            String?
+  parentId        String?
+  parent          Category?           @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]          @relation("CategoryTree")
+  sortOrder       Int                 @default(0)
+  active          Boolean             @default(true)
+  highValue       Boolean             @default(false) // cars/property: enquiry + reported sale, no online checkout
+  listings        Listing[]           @relation("ListingCategory")
+  subListings     Listing[]           @relation("ListingSubcategory")
+  attributes      CategoryAttribute[]
   commissionRules CommissionRule[]
-  offers        Offer[]
+  offers          Offer[]
 }
 
 /// Admin-defined fields for the dynamic listing form
@@ -174,51 +175,51 @@ model CategoryAttribute {
 }
 
 model Listing {
-  id            String             @id @default(cuid())
-  sellerId      String
-  seller        User               @relation("SellerListings", fields: [sellerId], references: [id])
-  title         String
-  categoryId    String
-  category      Category           @relation("ListingCategory", fields: [categoryId], references: [id])
-  subcategoryId String?
-  subcategory   Category?          @relation("ListingSubcategory", fields: [subcategoryId], references: [id])
-  description   String
-  declaredValue Int? // seller's declared product value (cents)
-  price         Int // selling price (cents)
-  deliveryFee   Int                @default(0)
-  condition     String             @default("USED") // NEW | USED | REFURBISHED
-  brand         String?
-  model         String?
-  location      String
-  state         String?
-  postcode      String?
-  videoUrl      String?
-  contactPhone  String?
-  contactEmail  String?
-  allowEnquiry  Boolean            @default(true)
-  allowCheckout Boolean            @default(false)
-  quantity      Int                @default(1)
-  availability  String             @default("AVAILABLE")
+  id             String             @id @default(cuid())
+  sellerId       String
+  seller         User               @relation("SellerListings", fields: [sellerId], references: [id])
+  title          String
+  categoryId     String
+  category       Category           @relation("ListingCategory", fields: [categoryId], references: [id])
+  subcategoryId  String?
+  subcategory    Category?          @relation("ListingSubcategory", fields: [subcategoryId], references: [id])
+  description    String
+  declaredValue  Int? // seller's declared product value (cents)
+  price          Int // selling price (cents)
+  deliveryFee    Int                @default(0)
+  condition      String             @default("USED") // NEW | USED | REFURBISHED
+  brand          String?
+  model          String?
+  location       String
+  state          String?
+  postcode       String?
+  videoUrl       String?
+  contactPhone   String?
+  contactEmail   String?
+  allowEnquiry   Boolean            @default(true)
+  allowCheckout  Boolean            @default(false)
+  quantity       Int                @default(1)
+  availability   String             @default("AVAILABLE")
   // DRAFT | PENDING | ACTIVE | PAUSED | SOLD | REJECTED | EXPIRED | SUSPENDED
-  status        String             @default("DRAFT")
-  statusReason  String?
-  seoTitle      String?
+  status         String             @default("DRAFT")
+  statusReason   String?
+  seoTitle       String?
   seoDescription String?
-  keywords      String?
-  featured      Boolean            @default(false)
-  views         Int                @default(0)
-  publishedAt   DateTime?
-  expiresAt     DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  images        ListingImage[]
-  attributes    ListingAttribute[]
-  enquiries     Enquiry[]
-  orderItems    OrderItem[]
-  sales         Sale[]
-  campaigns     Campaign[]
-  offers        Offer[]
-  wishlistedBy  WishlistItem[]
+  keywords       String?
+  featured       Boolean            @default(false)
+  views          Int                @default(0)
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  images         ListingImage[]
+  attributes     ListingAttribute[]
+  enquiries      Enquiry[]
+  orderItems     OrderItem[]
+  sales          Sale[]
+  campaigns      Campaign[]
+  offers         Offer[]
+  wishlistedBy   WishlistItem[]
 
   @@index([status, categoryId])
 }
@@ -410,32 +411,32 @@ model CommissionRecord {
 }
 
 model CommissionInvoice {
-  id            String           @id @default(cuid())
-  invoiceNumber String           @unique
-  sellerId      String
-  commissionId  String           @unique
-  commission    CommissionRecord @relation(fields: [commissionId], references: [id])
-  amount        Int
-  dueDate       DateTime
-  status        String           @default("ISSUED") // ISSUED | PAID | OVERDUE | VOID
-  paidAt        DateTime?
+  id             String           @id @default(cuid())
+  invoiceNumber  String           @unique
+  sellerId       String
+  commissionId   String           @unique
+  commission     CommissionRecord @relation(fields: [commissionId], references: [id])
+  amount         Int
+  dueDate        DateTime
+  status         String           @default("ISSUED") // ISSUED | PAID | OVERDUE | VOID
+  paidAt         DateTime?
   markedPaidById String?
-  reference     String?
-  createdAt     DateTime         @default(now())
+  reference      String?
+  createdAt      DateTime         @default(now())
 }
 
 model Payout {
-  id        String    @id @default(cuid())
-  sellerId  String
-  saleId    String    @unique
-  sale      Sale      @relation(fields: [saleId], references: [id])
-  gross     Int
+  id         String    @id @default(cuid())
+  sellerId   String
+  saleId     String    @unique
+  sale       Sale      @relation(fields: [saleId], references: [id])
+  gross      Int
   commission Int
-  amount    Int
-  status    String    @default("SCHEDULED") // SCHEDULED | HELD | PAID | CANCELLED
+  amount     Int
+  status     String    @default("SCHEDULED") // SCHEDULED | HELD | PAID | CANCELLED
   holdReason String?
-  paidAt    DateTime?
-  createdAt DateTime  @default(now())
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 // ---------------------------------------------------------------- payments
@@ -470,12 +471,12 @@ model Payment {
 }
 
 model WebhookEvent {
-  id          String   @id // provider event id — unique, so replays are ignored
-  provider    String
-  type        String
-  payload     String
-  result      String?
-  receivedAt  DateTime @default(now())
+  id         String   @id // provider event id — unique, so replays are ignored
+  provider   String
+  type       String
+  payload    String
+  result     String?
+  receivedAt DateTime @default(now())
 }
 
 model Refund {
@@ -674,6 +675,19 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+}
+
+/// Browser push (Firebase Cloud Messaging) registration token, one per browser/device
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 /// Outbound email/SMS log (dev outbox). Swap delivery for a real provider in production.

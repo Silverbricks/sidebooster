@@ -11,3 +11,6 @@ export const firebaseConfig = {
   appId: "1:395618946963:web:f6820208d0fe1e59bfe266",
   measurementId: "G-Y3C68LLP5S",
 } as const;
+
+// Cloud Messaging → Web Push certificates → key pair (public VAPID key; safe to publish)
+export const firebaseVapidKey = "BDKiOsZ0IItXwV5iAbmZXn4LjXcF2JSTapTF7qM591SWjOzc5Yj8PlOx0DlGq7y_JNaX1ez6tAMz97us4foReEY";

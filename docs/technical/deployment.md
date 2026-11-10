@@ -61,3 +61,12 @@ Never point staging at the production database.
 - The SDK is lazy-loaded through `src/lib/firebase.ts`. Use `track(name, params)` for custom events.
 - Restrict the API key to `sidebooster.com` and `*.sidebooster.com` in Google Cloud Console → APIs & Services → Credentials.
 - Mention Google Analytics in the Privacy Policy.
+
+## Push notifications (Firebase Cloud Messaging)
+
+- **How users turn it on:** Account → Notifications → "Turn on". This saves the browser's FCM token in the `PushToken` table (migration `20261110000000_push_tokens`).
+- **What gets pushed:** every in-app notification created by `notify()` is also pushed. The send is deferred until the notification row is committed, so a rolled-back transaction never sends a push. Tokens that FCM rejects are deleted.
+- **Service worker:** `public/firebase-messaging-sw.js` displays data-only messages and only opens URLs on the site itself.
+- **Public VAPID key:** stored in `src/config/firebase.ts`.
+- **Server credential:** `FIREBASE_SERVICE_ACCOUNT`, the service-account JSON encoded in base64. It is a **secret**, so keep it in `.env.production` only. If it isn't set, push is skipped and the rest of the app works as before.
+- **iPhone/iPad:** web push works only after the user adds the site to the Home Screen (iOS 16.4 or later).

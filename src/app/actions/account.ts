@@ -31,3 +31,23 @@ export async function markAllReadAction() {
   await db.notification.updateMany({ where: { userId: user.id, readAt: null }, data: { readAt: new Date() } });
   revalidatePath("/account/notifications");
 }
+
+/** Save this browser's Firebase Cloud Messaging token so the user gets push notifications here. */
+export async function savePushTokenAction(token: string, userAgent?: string) {
+  const user = await requireUser();
+  if (typeof token !== "string" || token.length < 20 || token.length > 4096) return { ok: false };
+  await db.pushToken.upsert({
+    where: { token },
+    create: { token, userId: user.id, userAgent: userAgent?.slice(0, 300) ?? null },
+    update: { userId: user.id, userAgent: userAgent?.slice(0, 300) ?? null },
+  });
+  return { ok: true };
+}
+
+/** Stop push notifications on this browser. */
+export async function removePushTokenAction(token: string) {
+  const user = await requireUser();
+  if (typeof token !== "string") return { ok: false };
+  await db.pushToken.deleteMany({ where: { token, userId: user.id } });
+  return { ok: true };
+}
