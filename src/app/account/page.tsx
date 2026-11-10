@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { Badge, Flash, KV, PageHeader, Section, Stat } from "@/components/ui";
 import { ACCOUNT_STATUS, AU_STATES, SELLER_STATUS } from "@/lib/constants";
 import { date } from "@/lib/format";
+import { formatDob } from "@/lib/au-validation";
 
 export const metadata = { title: "My account" };
 
@@ -43,7 +44,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <div><label className="label">Name</label><input className="input bg-slate-50" value={user.name} readOnly /></div>
           <div><label className="label" htmlFor="displayName">Public display name (if you win)</label><input id="displayName" name="displayName" defaultValue={user.displayName ?? ""} className="input" placeholder={`${user.firstName} ${user.lastName[0]}.`} /></div>
           <div><label className="label" htmlFor="dateOfBirth">Date of birth</label>
-            {user.dateOfBirth ? <input className="input bg-slate-50" value={date(user.dateOfBirth)} readOnly /> : <input id="dateOfBirth" name="dateOfBirth" type="date" className="input" />}
+            {user.dateOfBirth ? <input className="input bg-slate-50" value={formatDob(user.dateOfBirth)} readOnly /> : <input id="dateOfBirth" name="dateOfBirth" className="input" placeholder="DD/MM/YYYY" pattern="\d{1,2}/\d{1,2}/\d{4}" inputMode="numeric" maxLength={10} />}
             <p className="hint">Required for promotions. Contact support to correct it once set.</p>
           </div>
           <div><label className="label" htmlFor="state">State</label>

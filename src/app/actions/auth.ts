@@ -4,43 +4,54 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createSession, destroySession, getCurrentUser, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { back, attempt } from "@/lib/action-utils";
-import { nextPublicId, normaliseEmail, normaliseMobile, passwordProblems, isValidAbn, isValidAcn } from "@/lib/ids";
+import { nextPublicId, normaliseEmail, passwordProblems } from "@/lib/ids";
+import { parseAuMobile, parseDob, postcodeMatchesState, STATE_CODES } from "@/lib/au-validation";
+import { readSellerBusiness } from "@/lib/seller-business-form";
+import { consentProblem, localityOnly, MIN_SELLER_AGE, readConsent, readLocationForm, recordConsents, requestMeta, runBusinessCheck, saveSellerLocation } from "@/lib/seller-verification";
 import { optStr, str, ageOn } from "@/lib/format";
 import { randomToken } from "@/lib/crypto";
 import { appUrl, sendEmail } from "@/lib/notify";
 import { refreshAccountStatus, riskScreen, sendMobileOtp, verifyMobileOtp } from "@/lib/accounts";
 import { audit } from "@/lib/audit";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { AU_STATES } from "@/lib/constants";
 
-const STATE_CODES = AU_STATES.map((s) => s.code as string);
+type Identity = { firstName: string; lastName: string; email: string; mobile: string; password: string; state: string | null; postcode: string | null; dob: Date | null };
 
-type Identity = { firstName: string; lastName: string; email: string; mobile: string; password: string; state: string; postcode: string; dob: Date | null };
-
-function readIdentity(fd: FormData, path: string, requireDob: boolean): Identity {
+function readIdentity(fd: FormData, path: string, opts: { requireDob: boolean; seller?: boolean }): Identity {
   if (str(fd.get("website"))) back(path, { error: "Registration failed." }); // honeypot
   const firstName = str(fd.get("firstName"));
   const lastName = str(fd.get("lastName"));
   const email = normaliseEmail(str(fd.get("email")));
-  const mobile = normaliseMobile(str(fd.get("mobile")));
+  const mobile = parseAuMobile(str(fd.get("mobile")));
   const password = str(fd.get("password"));
-  const state = str(fd.get("state"));
-  const postcode = str(fd.get("postcode"));
   const dobRaw = str(fd.get("dateOfBirth"));
-  const dob = dobRaw ? new Date(`${dobRaw}T00:00:00Z`) : null;
 
   if (!firstName || !lastName) back(path, { error: "Enter your first and last name." });
+  if (firstName.length > 60 || lastName.length > 60) back(path, { error: "Names must be 60 characters or fewer." });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) back(path, { error: "Enter a valid email address." });
-  if (!mobile) back(path, { error: "Enter a valid Australian mobile number (04xx xxx xxx)." });
+  if (!mobile.ok) back(path, { error: mobile.error });
   const pw = passwordProblems(password);
   if (pw.length) back(path, { error: `Password needs ${pw.join(", ")}.` });
   if (password !== str(fd.get("confirmPassword"))) back(path, { error: "Passwords do not match." });
-  if (!STATE_CODES.includes(state)) back(path, { error: "Choose your state or territory." });
-  if (!/^\d{4}$/.test(postcode)) back(path, { error: "Enter a 4-digit postcode." });
-  if (requireDob && !dob) back(path, { error: "Date of birth is required." });
-  if (dob && (isNaN(dob.getTime()) || ageOn(dob) < 18)) back(path, { error: "You must be 18 or older to register." });
-  if (fd.get("terms") !== "on") back(path, { error: "You must accept the Terms & Conditions and Privacy Policy." });
-  return { firstName, lastName, email, mobile: mobile!, password, state, postcode, dob };
+  let state: string | null = null;
+  let postcode: string | null = null;
+  if (!opts.seller) {
+    state = str(fd.get("state"));
+    postcode = str(fd.get("postcode"));
+    if (!STATE_CODES.includes(state)) back(path, { error: "Choose your state or territory." });
+    if (!/^\d{4}$/.test(postcode)) back(path, { error: "Enter a 4-digit postcode." });
+    if (!postcodeMatchesState(postcode, state)) back(path, { error: `Postcode ${postcode} isn't in ${state}. Check the postcode and state.` });
+  }
+  if (opts.requireDob && !dobRaw) back(path, { error: "Date of birth is required (DD/MM/YYYY)." });
+  let dob: Date | null = null;
+  if (dobRaw) {
+    const r = parseDob(dobRaw, MIN_SELLER_AGE);
+    if (!r.ok) back(path, { error: opts.seller ? r.error : r.error.replace("to register as a seller. Under-18 registrations aren't accepted.", "to register.") });
+    dob = r.date;
+  }
+  const cp = consentProblem(readConsent(fd));
+  if (cp) back(path, { error: cp });
+  return { firstName, lastName, email, mobile: (mobile as { e164: string }).e164, password, state, postcode, dob };
 }
 
 async function assertUnique(email: string, mobile: string, path: string) {
@@ -57,13 +68,14 @@ async function sendVerificationEmail(userId: string, email: string) {
 export async function registerBuyerAction(fd: FormData) {
   const path = "/register";
   if (!rateLimit(`reg:${await clientIp()}`, 5, 3600_000)) back(path, { error: "Too many registrations from this network. Try again later." });
-  const id = readIdentity(fd, path, false);
+  const id = readIdentity(fd, path, { requireDob: false });
   await assertUnique(id.email, id.mobile, path);
   const flags = await riskScreen({ firstName: id.firstName, lastName: id.lastName, dateOfBirth: id.dob, postcode: id.postcode });
+  const meta = await requestMeta();
 
   const user = await db.$transaction(async (tx) => {
     const publicId = await nextPublicId(tx, "BUY");
-    return tx.user.create({
+    const u = await tx.user.create({
       data: {
         publicId,
         email: id.email,
@@ -82,6 +94,8 @@ export async function registerBuyerAction(fd: FormData) {
         riskFlags: flags.join(",") || null,
       },
     });
+    await recordConsents(u.id, readConsent(fd), meta, tx);
+    return u;
   });
   await audit(user.id, "USER_REGISTERED", "User", user.id, { publicId: user.publicId, flags });
   await sendVerificationEmail(user.id, user.email);
@@ -93,44 +107,49 @@ export async function registerBuyerAction(fd: FormData) {
 export async function registerSellerAction(fd: FormData) {
   const path = "/register/seller";
   const current = await getCurrentUser();
-  const sellerType = str(fd.get("sellerType")) === "BUSINESS" ? "BUSINESS" : "INDIVIDUAL";
-  const legalName = str(fd.get("legalName"));
-  const address = str(fd.get("address"));
-  const businessName = optStr(fd.get("businessName"));
-  const abn = optStr(fd.get("abn"))?.replace(/\s/g, "") ?? null;
-  const acn = optStr(fd.get("acn"))?.replace(/\s/g, "") ?? null;
-  const authorisedRep = optStr(fd.get("authorisedRep"));
-  if (!legalName) back(path, { error: sellerType === "BUSINESS" ? "Enter the legal business name." : "Enter your full legal name." });
-  if (!address) back(path, { error: "Enter your address." });
-  if (sellerType === "BUSINESS") {
-    if (!abn && !acn) back(path, { error: "Business sellers must provide an ABN or ACN." });
-    if (abn && !isValidAbn(abn)) back(path, { error: "That ABN is not valid." });
-    if (acn && !isValidAcn(acn)) back(path, { error: "That ACN is not valid." });
-    if (!authorisedRep) back(path, { error: "Enter the authorised representative." });
-  }
+  const biz = readSellerBusiness(fd, path);
+  const loc = readLocationForm(fd);
+  if (loc.problem) back(path, { error: loc.problem });
+  const r = loc.form.residential;
+  const profileData = {
+    sellerType: biz.sellerType, businessStructure: biz.structure, legalName: biz.legalName, businessName: biz.businessName, abn: biz.abn, acn: biz.acn,
+    authorisedRep: biz.authorisedRep, abnConfirmedAt: biz.abnConfirmed ? new Date() : null, bio: biz.bio,
+    address: localityOnly(r), country: r.country, suburb: r.suburb, state: r.state, postcode: r.postcode,
+  };
+  const meta = await requestMeta();
 
   if (current) {
     // existing buyer upgrades to seller: keeps their Buyer ID, gets a Seller ID
     if (current.sellerProfile) redirect("/seller");
     if (current.role === "ADMIN") back(path, { error: "Admins cannot register as sellers." });
-    if (!current.dateOfBirth && sellerType === "INDIVIDUAL") back(path, { error: "Add your date of birth in your profile first." });
-    await db.$transaction(async (tx) => {
-      const sellerCode = await nextPublicId(tx, sellerType === "BUSINESS" ? "BUS" : "SEL");
-      await tx.sellerProfile.create({
-        data: { userId: current.id, sellerCode, sellerType, legalName, businessName, abn, acn, authorisedRep, address, state: current.state, postcode: current.postcode, bio: optStr(fd.get("bio")) },
-      });
-      await tx.user.update({ where: { id: current.id }, data: { role: "SELLER" } });
-      await audit(current.id, "SELLER_REGISTERED", "SellerProfile", sellerCode, { sellerType }, tx);
+    let dob = current.dateOfBirth;
+    if (!dob) {
+      const d = parseDob(str(fd.get("dateOfBirth")), MIN_SELLER_AGE);
+      if (!d.ok) back(path, { error: d.error });
+      dob = (d as { date: Date }).date;
+    } else if (ageOn(dob) < MIN_SELLER_AGE) back(path, { error: `You must be ${MIN_SELLER_AGE} or older to register as a seller.` });
+    const consent = readConsent(fd);
+    const cp = consentProblem(consent);
+    if (cp) back(path, { error: cp });
+    const sp = await db.$transaction(async (tx) => {
+      const sellerCode = await nextPublicId(tx, biz.sellerType === "BUSINESS" ? "BUS" : "SEL");
+      const created = await tx.sellerProfile.create({ data: { userId: current.id, sellerCode, ...profileData } });
+      await tx.user.update({ where: { id: current.id }, data: { role: "SELLER", dateOfBirth: dob } });
+      await recordConsents(current.id, consent, meta, tx);
+      await audit(current.id, "SELLER_REGISTERED", "SellerProfile", sellerCode, { structure: biz.structure }, tx);
+      return created;
     });
+    await saveSellerLocation(sp.id, current.id, loc.form);
+    if (biz.abn || biz.acn) await runBusinessCheck(sp.id, current.id);
     redirect("/seller/verification");
   }
 
   if (!rateLimit(`reg:${await clientIp()}`, 5, 3600_000)) back(path, { error: "Too many registrations from this network. Try again later." });
-  const id = readIdentity(fd, path, sellerType === "INDIVIDUAL");
+  const id = readIdentity(fd, path, { requireDob: true, seller: true });
   await assertUnique(id.email, id.mobile, path);
-  const flags = await riskScreen({ firstName: id.firstName, lastName: id.lastName, dateOfBirth: id.dob, postcode: id.postcode });
-  const user = await db.$transaction(async (tx) => {
-    const sellerCode = await nextPublicId(tx, sellerType === "BUSINESS" ? "BUS" : "SEL");
+  const flags = await riskScreen({ firstName: id.firstName, lastName: id.lastName, dateOfBirth: id.dob, postcode: r.postcode });
+  const { user, sp } = await db.$transaction(async (tx) => {
+    const sellerCode = await nextPublicId(tx, biz.sellerType === "BUSINESS" ? "BUS" : "SEL");
     const u = await tx.user.create({
       data: {
         publicId: sellerCode,
@@ -140,8 +159,9 @@ export async function registerSellerAction(fd: FormData) {
         lastName: id.lastName,
         name: `${id.firstName} ${id.lastName}`,
         mobile: id.mobile,
-        state: id.state,
-        postcode: id.postcode,
+        state: r.state,
+        postcode: r.postcode,
+        suburb: r.suburb,
         dateOfBirth: id.dob,
         termsAcceptedAt: new Date(),
         role: "SELLER",
@@ -149,12 +169,13 @@ export async function registerSellerAction(fd: FormData) {
         riskFlags: flags.join(",") || null,
       },
     });
-    await tx.sellerProfile.create({
-      data: { userId: u.id, sellerCode, sellerType, legalName, businessName, abn, acn, authorisedRep, address, state: id.state, postcode: id.postcode, bio: optStr(fd.get("bio")) },
-    });
-    return u;
+    const created = await tx.sellerProfile.create({ data: { userId: u.id, sellerCode, ...profileData } });
+    await recordConsents(u.id, readConsent(fd), meta, tx);
+    return { user: u, sp: created };
   });
-  await audit(user.id, "SELLER_REGISTERED", "User", user.id, { publicId: user.publicId, sellerType, flags });
+  await audit(user.id, "SELLER_REGISTERED", "User", user.id, { publicId: user.publicId, structure: biz.structure, flags });
+  await saveSellerLocation(sp.id, user.id, loc.form);
+  if (biz.abn || biz.acn) await runBusinessCheck(sp.id, user.id);
   await sendVerificationEmail(user.id, user.email);
   await sendMobileOtp(user.id);
   await createSession(user.id);

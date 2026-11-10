@@ -3,7 +3,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { back } from "@/lib/action-utils";
-import { ageOn, optStr, str } from "@/lib/format";
+import { optStr, str } from "@/lib/format";
+import { parseDob, postcodeMatchesState } from "@/lib/au-validation";
 import { AU_STATES } from "@/lib/constants";
 import { audit } from "@/lib/audit";
 
@@ -14,12 +15,13 @@ export async function updateProfileAction(fd: FormData) {
   const dobRaw = str(fd.get("dateOfBirth"));
   if (state && !AU_STATES.some((s) => s.code === state)) back("/account", { error: "Invalid state." });
   if (postcode && !/^\d{4}$/.test(postcode)) back("/account", { error: "Postcode must be 4 digits." });
+  if (postcode && state && !postcodeMatchesState(postcode, state)) back("/account", { error: `Postcode ${postcode} isn't in ${state}.` });
   const data: Record<string, unknown> = { displayName: optStr(fd.get("displayName")), suburb: optStr(fd.get("suburb")), state: state || null, postcode: postcode || null };
   // date of birth can be set once by the user; later corrections go through support (eligibility integrity)
   if (dobRaw && !user.dateOfBirth) {
-    const dob = new Date(`${dobRaw}T00:00:00Z`);
-    if (isNaN(dob.getTime()) || ageOn(dob) < 18) back("/account", { error: "You must be 18 or older." });
-    data.dateOfBirth = dob;
+    const r = parseDob(dobRaw, 18);
+    if (!r.ok) back("/account", { error: r.error.replace(" to register as a seller. Under-18 registrations aren't accepted.", ".") });
+    data.dateOfBirth = (r as { date: Date }).date;
   }
   await db.user.update({ where: { id: user.id }, data });
   await audit(user.id, "PROFILE_UPDATED", "User", user.id, { fields: Object.keys(data) });

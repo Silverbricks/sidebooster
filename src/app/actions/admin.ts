@@ -14,6 +14,7 @@ import { approveSchedule, campaignComplianceProblems, cancelCampaign, lockCampai
 import { adjustCommission, adminDecideSale, approveCommission, markInvoicePaid, reverseCommission, waiveCommission } from "@/lib/commission";
 import { completeOrder, processRefund } from "@/lib/payments";
 import { paymentProvider } from "@/lib/payment-provider";
+import { approvalProblems, refreshLocationStatus, runBusinessCheck } from "@/lib/seller-verification";
 
 const reasonOf = (fd: FormData) => optStr(fd.get("reason"));
 function needReason(r: string | null, path: string): asserts r is string {
@@ -57,9 +58,13 @@ export async function sellerDecisionAction(fd: FormData) {
   const decision = str(fd.get("decision")); // APPROVE | REJECT | DOCUMENTS_REQUIRED | SUSPEND | REINSTATE
   const path = `/admin/sellers/${id}`;
   const reason = reasonOf(fd);
-  const sp = await db.sellerProfile.findUniqueOrThrow({ where: { id }, include: { user: true } });
+  const sp = await db.sellerProfile.findUniqueOrThrow({ where: { id }, include: { user: true, documents: true } });
   if (decision !== "APPROVE" && decision !== "REINSTATE") needReason(reason, path);
-  if (decision === "APPROVE" && sp.user.accountStatus !== "ACTIVE") back(path, { error: "The seller's email/mobile verification is not complete (or the account is restricted)." });
+  if (decision === "APPROVE") {
+    // backend gate: every mandatory check must be complete — cannot be bypassed from the browser
+    const problems = await approvalProblems(sp.user, sp);
+    if (problems.length) back(path, { error: `Can't approve yet — ${problems.join(" · ")}` });
+  }
   const status = { APPROVE: "APPROVED", REJECT: "REJECTED", DOCUMENTS_REQUIRED: "DOCUMENTS_REQUIRED", SUSPEND: "SUSPENDED", REINSTATE: "APPROVED" }[decision];
   if (!status) back(path, { error: "Invalid decision." });
   await db.sellerProfile.update({ where: { id }, data: { status, statusReason: reason, ...(status === "APPROVED" ? { approvedById: admin.id, approvedAt: new Date() } : {}) } });
@@ -83,7 +88,52 @@ export async function documentDecisionAction(fd: FormData) {
   const status = str(fd.get("status")) === "ACCEPTED" ? "ACCEPTED" : "REJECTED";
   const d = await db.sellerDocument.update({ where: { id }, data: { status, reviewedById: admin.id, reviewNote: reasonOf(fd) } });
   await audit(admin.id, `DOCUMENT_${status}`, "SellerDocument", id, null, db, reasonOf(fd));
+  await refreshLocationStatus(d.sellerId); // an accepted proof of address can complete location verification
   back(`/admin/sellers/${d.sellerId}`, { ok: `Document ${status.toLowerCase()}.` });
+}
+
+/** Manual location decision (verification method 5: administrator). */
+export async function sellerLocationDecisionAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd.get("id"));
+  const path = `/admin/sellers/${id}`;
+  const decision = str(fd.get("decision"));
+  if (!["VERIFIED", "FAILED", "MANUAL_REVIEW"].includes(decision)) back(path, { error: "Invalid decision." });
+  const reason = reasonOf(fd);
+  if (decision !== "VERIFIED") needReason(reason, path);
+  const sp = await db.sellerProfile.findUniqueOrThrow({ where: { id } });
+  if (decision === "VERIFIED" && (!sp.streetAddressEnc || !sp.pinConfirmedAt)) back(path, { error: "The seller hasn't entered an address and confirmed the map pin yet." });
+  await db.sellerProfile.update({
+    where: { id },
+    data: {
+      locationStatus: decision, locationNotes: reason ?? (decision === "VERIFIED" ? "Verified by admin." : null), locationCheckedAt: new Date(),
+      locationMethod: decision === "MANUAL_REVIEW" ? null : "MANUAL", locationVerifiedById: decision === "MANUAL_REVIEW" ? null : admin.id,
+      locationVerifiedAt: decision === "VERIFIED" ? new Date() : null,
+    },
+  });
+  await audit(admin.id, `SELLER_LOCATION_${decision}`, "SellerProfile", id, null, db, reason);
+  if (decision === "FAILED") await notify(sp.userId, { type: "SELLER_STATUS", title: "Address verification failed", body: `We couldn't verify your address: ${reason}. Please correct it on your verification page.`, link: "/seller/verification" });
+  back(path, { ok: "Location decision saved." });
+}
+
+/** Re-run the ABR check, or record a manual decision on the business details. */
+export async function sellerBusinessDecisionAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd.get("id"));
+  const path = `/admin/sellers/${id}`;
+  const decision = str(fd.get("decision")); // RECHECK | VERIFIED | MISMATCH
+  const reason = reasonOf(fd);
+  if (decision === "RECHECK") {
+    const r = await runBusinessCheck(id, admin.id);
+    back(path, { ok: `ABR check: ${r.status.replace(/_/g, " ").toLowerCase()}.` });
+  }
+  if (!["VERIFIED", "MISMATCH"].includes(decision)) back(path, { error: "Invalid decision." });
+  needReason(reason, path);
+  const sp = await db.sellerProfile.findUniqueOrThrow({ where: { id } });
+  await db.sellerProfile.update({ where: { id }, data: { businessCheckStatus: decision, businessVerifiedById: admin.id, businessCheckedAt: new Date() } });
+  await audit(admin.id, `SELLER_BUSINESS_${decision}`, "SellerProfile", id, null, db, reason);
+  if (decision === "MISMATCH") await notify(sp.userId, { type: "SELLER_STATUS", title: "Business details need correcting", body: `${reason}. Please update your ABN/ACN details on your verification page.`, link: "/seller/verification" });
+  back(path, { ok: "Business decision saved." });
 }
 
 export async function sellerPermissionsAction(fd: FormData) {

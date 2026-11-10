@@ -48,6 +48,8 @@ model User {
   postcode         String?
   dateOfBirth      DateTime?
   riskFlags        String? // comma separated flags from duplicate/risk screening
+  marketingOptIn   Boolean   @default(false) // separate, optional consent (never bundled with Terms)
+  marketingOptInAt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -68,6 +70,7 @@ model User {
   salesAsSeller   Sale[]           @relation("SaleSeller")
   wishlist        WishlistItem[]
   pushTokens      PushToken[]
+  consents        ConsentRecord[]
 }
 
 model Session {
@@ -80,32 +83,54 @@ model Session {
 }
 
 model SellerProfile {
-  id              String           @id @default(cuid())
-  userId          String           @unique
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sellerCode      String           @unique // SEL-000001 (individual) / BUS-000001 (business)
-  sellerType      String           @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
-  legalName       String
-  businessName    String?
-  abn             String?
-  acn             String?
-  authorisedRep   String?
-  address         String
-  state           String?
-  postcode        String?
-  bio             String?
+  id                   String           @id @default(cuid())
+  userId               String           @unique
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerCode           String           @unique // SEL-000001 (individual) / BUS-000001 (business)
+  sellerType           String           @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
+  legalName            String
+  businessName         String?
+  abn                  String?
+  acn                  String?
+  authorisedRep        String?
+  address              String
+  state                String?
+  postcode             String?
+  bio                  String?
+  /// INDIVIDUAL | REGISTERED_BUSINESS | COMPANY | PARTNERSHIP | TRUST | OTHER (sellerType stays INDIVIDUAL/BUSINESS for compatibility)
+  businessStructure    String?
+  abnConfirmedAt       DateTime? // seller confirmed the ABN/ACN belongs to them
+  /// NOT_CHECKED | VERIFIED | MISMATCH | INACTIVE | NOT_FOUND | MANUAL_REVIEW
+  businessCheckStatus  String           @default("NOT_CHECKED")
+  businessCheckData    Json? // ABR lookup result + problems
+  businessCheckedAt    DateTime?
+  businessVerifiedById String? // admin who manually verified the business details
+  // ---- location verification (street-level data is encrypted at rest)
+  country              String           @default("AU")
+  suburb               String?
+  streetAddressEnc     String? // AES-GCM {unit, street}
+  businessAddressEnc   String? // AES-GCM full business address, when different from residential
+  geoEnc               String? // AES-GCM {pin, geocoded, distanceM, checkedAt}
+  pinConfirmedAt       DateTime?
+  /// NOT_VERIFIED | PENDING | VERIFIED | FAILED | MANUAL_REVIEW
+  locationStatus       String           @default("NOT_VERIFIED")
+  locationNotes        String?
+  locationCheckedAt    DateTime?
+  locationVerifiedById String?
+  locationVerifiedAt   DateTime?
+  locationMethod       String? // AUTO_DOCUMENT | MANUAL
   // REGISTERED | VERIFICATION_PENDING | DOCUMENTS_REQUIRED | UNDER_REVIEW | APPROVED | ACTIVE | SUSPENDED | REJECTED | CLOSED
-  status          String           @default("VERIFICATION_PENDING")
-  statusReason    String?
-  approvedById    String?
-  approvedAt      DateTime?
-  trustedSeller   Boolean          @default(false) // listings auto-approve if the approval rule allows it
-  canRunFreeDraws Boolean          @default(false)
-  canRunPaidDraws Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  documents       SellerDocument[]
-  paymentAccount  PaymentAccount?
+  status               String           @default("VERIFICATION_PENDING")
+  statusReason         String?
+  approvedById         String?
+  approvedAt           DateTime?
+  trustedSeller        Boolean          @default(false) // listings auto-approve if the approval rule allows it
+  canRunFreeDraws      Boolean          @default(false)
+  canRunPaidDraws      Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  documents            SellerDocument[]
+  paymentAccount       PaymentAccount?
 }
 
 model SellerDocument {
@@ -675,6 +700,21 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+}
+
+/// Record of each legal consent (Terms, Privacy, Marketing) with the document version accepted.
+model ConsentRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // TERMS | PRIVACY | MARKETING
+  version    String // CMS page last-updated timestamp at the time of acceptance
+  granted    Boolean  @default(true)
+  ip         String?
+  userAgent  String?
+  acceptedAt DateTime @default(now())
+
+  @@index([userId, type])
 }
 
 /// Browser push (Firebase Cloud Messaging) registration token, one per browser/device

@@ -3,13 +3,24 @@ import { redirect } from "next/navigation";
 import { registerSellerAction } from "@/app/actions/auth";
 import { IdentityFields } from "@/components/IdentityFields";
 import { SellerTypeFields } from "@/components/SellerTypeFields";
+import { LocationFields } from "@/components/LocationFields";
+import { ConsentFields } from "@/components/ConsentFields";
 import { SubmitButton } from "@/components/SubmitButton";
-import { Flash } from "@/components/ui";
+import { Field, Flash } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata = { title: "Seller registration" };
 
-const STEPS = ["Register & get your Seller ID", "Verify email and mobile", "Upload identity / business documents", "Admin verification", "Connect payout account", "Create listings (each listing is reviewed)"];
+const STEPS = [
+  "Register & get your Seller ID",
+  "Verify your mobile (SMS code) and email",
+  "ABN / ACN checked on the Australian Business Register",
+  "Location verified (address, map pin, proof of address)",
+  "Identity & age (18+) — photo ID",
+  "Terms & Privacy accepted",
+  "Admin review → approved",
+  "Connect payout account, then list products",
+];
 
 export default async function SellerRegisterPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const user = await getCurrentUser();
@@ -23,15 +34,34 @@ export default async function SellerRegisterPage({ searchParams }: { searchParam
           {user ? <>You&apos;re upgrading <b>{user.publicId}</b>. You keep your Buyer ID and receive a separate Seller ID.</> : <>Already have a buyer account? <Link href="/login?next=/register/seller" className="link">Log in first</Link> to upgrade it.</>}
         </p>
         <div className="mt-6"><Flash sp={sp} /></div>
-        <form action={registerSellerAction} className="card card-pad space-y-6">
-          <SellerTypeFields />
-          {!user && (
-            <>
-              <hr className="border-line" />
-              <h2 className="h2">Your account</h2>
-              <IdentityFields dobRequired />
-            </>
-          )}
+        <form action={registerSellerAction} className="card card-pad space-y-8">
+          <section className="space-y-4">
+            <h2 className="h2">1. Business details</h2>
+            <SellerTypeFields />
+          </section>
+          <hr className="border-line" />
+          <section className="space-y-4">
+            <h2 className="h2">2. Location</h2>
+            <LocationFields />
+          </section>
+          <hr className="border-line" />
+          <section className="space-y-4">
+            <h2 className="h2">3. {user ? "Confirm & accept" : "Your account"}</h2>
+            {user ? (
+              <>
+                {!user.dateOfBirth && (
+                  <div className="max-w-xs">
+                    <Field label="Date of birth" name="dateOfBirth" required hint="DD/MM/YYYY — sellers must be 18 or older.">
+                      <input id="dateOfBirth" name="dateOfBirth" className="input" placeholder="DD/MM/YYYY" required pattern="\d{1,2}/\d{1,2}/\d{4}" inputMode="numeric" maxLength={10} />
+                    </Field>
+                  </div>
+                )}
+                <ConsentFields />
+              </>
+            ) : (
+              <IdentityFields dobRequired seller />
+            )}
+          </section>
           <SubmitButton>Register as seller</SubmitButton>
         </form>
       </div>
@@ -45,7 +75,8 @@ export default async function SellerRegisterPage({ searchParams }: { searchParam
             </li>
           ))}
         </ol>
-        <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">No verification = no selling. You can prepare draft listings while your account is reviewed.</p>
+        <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">No verification = no selling. Your registration is saved as a draft — you can finish the remaining steps from your seller dashboard.</p>
+        <p className="mt-3 text-xs text-muted">Your date of birth, mobile, street address and documents are private and never shown publicly.</p>
       </aside>
     </div>
   );

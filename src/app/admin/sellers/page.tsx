@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BUSINESS_CHECK_STATUS, LOCATION_STATUS } from "@/lib/seller-location";
 import { db } from "@/lib/db";
 import { date } from "@/lib/format";
 import { Badge, Empty, PageHeader } from "@/components/ui";
@@ -24,12 +25,14 @@ export default async function AdminSellers({ searchParams }: { searchParams: Pro
       {sellers.length ? (
         <div className="card overflow-x-auto">
           <table className="table">
-            <thead><tr><th>Seller ID</th><th>Legal name</th><th>Type</th><th>Docs</th><th>Payouts</th><th>Updated</th><th>Status</th></tr></thead>
+            <thead><tr><th>Seller ID</th><th>Legal name</th><th>Type</th><th>ABN check</th><th>Location</th><th>Docs</th><th>Payouts</th><th>Updated</th><th>Status</th></tr></thead>
             <tbody>{sellers.map((s) => (
               <tr key={s.id}>
                 <td><Link href={`/admin/sellers/${s.id}`} className="link font-mono">{s.sellerCode}</Link></td>
                 <td>{s.legalName}<div className="text-xs text-muted">{s.user.email}</div></td>
                 <td>{s.sellerType === "BUSINESS" ? `Business${s.abn ? ` · ABN ${s.abn}` : ""}` : "Individual"}</td>
+                <td><Badge status={s.businessCheckStatus} labels={BUSINESS_CHECK_STATUS} /></td>
+                <td><Badge status={s.locationStatus} labels={LOCATION_STATUS} /></td>
                 <td>{s._count.documents}</td>
                 <td>{s.paymentAccount?.payoutsEnabled ? "✅" : "⬜"}{s.paymentAccount?.payoutsHeld && " ⏸"}</td>
                 <td>{date(s.updatedAt)}</td>

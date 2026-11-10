@@ -16,6 +16,10 @@ import { markOrderFulfilled } from "@/lib/payments";
 import { paymentProvider } from "@/lib/payment-provider";
 import { notify } from "@/lib/notify";
 import crypto from "node:crypto";
+import { Prisma } from "@prisma/client";
+import { rateLimit } from "@/lib/rate-limit";
+import { readLocationForm, runBusinessCheck, saveSellerLocation, submissionProblems } from "@/lib/seller-verification";
+import { readSellerBusiness } from "@/lib/seller-business-form";
 
 // ---------------------------------------------------------------- verification
 
@@ -38,8 +42,10 @@ export async function submitVerificationAction() {
   const user = await requireSeller();
   const sp = await db.sellerProfile.findUniqueOrThrow({ where: { userId: user.id }, include: { documents: true } });
   const path = "/seller/verification";
-  if (user.accountStatus !== "ACTIVE") back(path, { error: "Verify your email and mobile first." });
   if (!["VERIFICATION_PENDING", "DOCUMENTS_REQUIRED", "REGISTERED"].includes(sp.status)) back(path, { error: "Already submitted." });
+  const problems = await submissionProblems(user, sp);
+  if (problems.length) back(path, { error: `Before submitting: ${problems.join(" ")}` });
+  if (user.accountStatus !== "ACTIVE") back(path, { error: "Your account isn't active yet — finish email and mobile verification at /verify." });
   if (await getBool("rule_seller_require_documents")) {
     const types = sp.documents.filter((d) => d.status !== "REJECTED").map((d) => d.documentType);
     if (!types.some((t) => t.startsWith("ID_"))) back(path, { error: "Upload a photo ID (driver licence or passport)." });
@@ -51,6 +57,45 @@ export async function submitVerificationAction() {
   const admins = await db.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
   for (const a of admins) await notify(a.id, { type: "SELLER_REVIEW", title: `Seller ${sp.sellerCode} awaiting verification`, body: sp.legalName, link: `/admin/sellers/${sp.id}`, email: false });
   back(path, { ok: "Submitted for admin review." });
+}
+
+const EDITABLE = ["VERIFICATION_PENDING", "DOCUMENTS_REQUIRED", "REGISTERED"];
+
+/** Seller saves / corrects their location while verification is pending (draft). Re-geocodes and re-evaluates. */
+export async function updateSellerLocationAction(fd: FormData) {
+  const user = await requireSeller();
+  const path = "/seller/verification";
+  const sp = user.sellerProfile;
+  if (!sp) back(path, { error: "No seller profile." });
+  if (!EDITABLE.includes(sp.status)) back(path, { error: "Your address can't be changed while under review or after approval. Contact support to update it." });
+  if (!rateLimit(`loc:${user.id}`, 10, 3600_000)) back(path, { error: "Too many address changes. Try again later." });
+  const loc = readLocationForm(fd);
+  if (loc.problem) back(path, { error: loc.problem });
+  const r = await saveSellerLocation(sp.id, user.id, loc.form);
+  await db.user.update({ where: { id: user.id }, data: { state: loc.form.residential.state, postcode: loc.form.residential.postcode, suburb: loc.form.residential.suburb } });
+  back(path, r.status === "MANUAL_REVIEW" ? { ok: "Address saved. Some details need a manual check by our team." } : { ok: "Address saved." });
+}
+
+/** Seller corrects business type / ABN / ACN while pending. Re-runs the ABR check. */
+export async function updateSellerBusinessAction(fd: FormData) {
+  const user = await requireSeller();
+  const path = "/seller/verification";
+  const sp = user.sellerProfile;
+  if (!sp) back(path, { error: "No seller profile." });
+  if (!EDITABLE.includes(sp.status)) back(path, { error: "Business details can't be changed while under review or after approval. Contact support." });
+  if (!rateLimit(`biz:${user.id}`, 10, 3600_000)) back(path, { error: "Too many changes. Try again later." });
+  const biz = readSellerBusiness(fd, path);
+  if ((biz.sellerType === "BUSINESS") !== (sp.sellerType === "BUSINESS")) back(path, { error: `Switching between an individual and a business seller changes your Seller ID (${sp.sellerCode}). Contact support to do this.` });
+  await db.sellerProfile.update({
+    where: { id: sp.id },
+    data: {
+      businessStructure: biz.structure, legalName: biz.legalName, businessName: biz.businessName, abn: biz.abn, acn: biz.acn, authorisedRep: biz.authorisedRep,
+      abnConfirmedAt: biz.abnConfirmed ? new Date() : null, businessCheckStatus: "NOT_CHECKED", businessCheckData: Prisma.DbNull, businessCheckedAt: null, businessVerifiedById: null,
+    },
+  });
+  await audit(user.id, "SELLER_BUSINESS_UPDATED", "SellerProfile", sp.id, { structure: biz.structure });
+  if (biz.abn || biz.acn) await runBusinessCheck(sp.id, user.id);
+  back(path, { ok: "Business details saved." });
 }
 
 export async function startPayoutOnboardingAction() {

@@ -1,4 +1,5 @@
 import type { Tx } from "./db";
+import { parseAuMobile } from "./au-validation";
 
 export type IdPrefix = "BUY" | "SEL" | "BUS" | "ADM";
 
@@ -16,13 +17,10 @@ export function normaliseEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-/** Normalise an Australian mobile to E.164 (+614XXXXXXXX). Returns null if invalid. */
+/** Normalise an Australian mobile to E.164 (+614XXXXXXXX). Returns null if invalid (see parseAuMobile for the reason). */
 export function normaliseMobile(input: string) {
-  const digits = input.replace(/[^\d+]/g, "");
-  let d = digits.startsWith("+61") ? digits.slice(3) : digits.startsWith("61") ? digits.slice(2) : digits.replace(/^0/, "");
-  d = d.replace(/\D/g, "");
-  if (!/^4\d{8}$/.test(d)) return null;
-  return `+61${d}`;
+  const r = parseAuMobile(input);
+  return r.ok ? r.e164 : null;
 }
 
 export function passwordProblems(pw: string) {
@@ -33,20 +31,4 @@ export function passwordProblems(pw: string) {
   return p;
 }
 
-/** ABN checksum validation (ATO algorithm). */
-export function isValidAbn(abn: string) {
-  const d = abn.replace(/\s/g, "");
-  if (!/^\d{11}$/.test(d)) return false;
-  const w = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
-  const nums = d.split("").map(Number);
-  nums[0] -= 1;
-  return nums.reduce((s, n, i) => s + n * w[i], 0) % 89 === 0;
-}
-
-export function isValidAcn(acn: string) {
-  const d = acn.replace(/\s/g, "");
-  if (!/^\d{9}$/.test(d)) return false;
-  const nums = d.split("").map(Number);
-  const sum = nums.slice(0, 8).reduce((s, n, i) => s + n * (8 - i), 0);
-  return (10 - (sum % 10)) % 10 === nums[8];
-}
+export { isValidAbn, isValidAcn } from "./au-validation";
