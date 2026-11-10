@@ -5,6 +5,7 @@
  * Run: npm run bootstrap
  */
 import { PrismaClient } from "@prisma/client";
+import { backfillPublicUrls } from "./backfill-urls";
 import bcrypt from "bcryptjs";
 import { CATEGORIES, PAGES, type Attr } from "./seed-data";
 
@@ -73,6 +74,10 @@ async function main() {
 }
 
 main()
+  .then(async () => {
+    const r = await backfillPublicUrls(db);
+    if (r.listings || r.stores) console.log(`Public URLs backfilled: ${r.listings} listings, ${r.stores} stores.`);
+  })
   .catch((e) => {
     console.error(e);
     process.exitCode = 1;

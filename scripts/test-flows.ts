@@ -16,6 +16,12 @@ import { evaluateBusiness } from "../src/lib/abr";
 import { addressProblem, evaluateLocation } from "../src/lib/seller-location";
 import { approvalProblems, readStoredLocation, refreshLocationStatus } from "../src/lib/seller-verification";
 import { encrypt } from "../src/lib/crypto";
+import { validateMobile } from "../src/lib/phone";
+import { chargeOnActivation, describeFees, feeSchedule } from "../src/lib/fees";
+import { socialUrlProblem } from "../src/lib/social";
+import { storeSlugProblem } from "../src/lib/urls";
+import { isAiSource, referralFromParams } from "../src/lib/referrals";
+import { backfillPublicUrls } from "../prisma/backfill-urls";
 
 let passed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -298,6 +304,63 @@ async function main() {
     const raw = await db.sellerProfile.findUniqueOrThrow({ where: { id: sp.id } });
     assert.ok(!raw.streetAddressEnc!.includes("George"));
     assert.equal(readStoredLocation(raw).residential?.street, "1 George St");
+  });
+
+  console.log("Pricing, storefronts, sharing & SEO");
+  await test("phone library confirms mobile type; sole traders need an ABN but never an ACN", async () => {
+    assert.ok(validateMobile("0412 345 678").ok);
+    assert.ok(!validateMobile("02 9876 5432").ok);
+    assert.match(businessIdProblems("SOLE_TRADER", null, null) ?? "", /ABN is required/);
+    assert.equal(businessIdProblems("SOLE_TRADER", "51824753556", null), null);
+    assert.match(businessIdProblems("SOLE_TRADER", "51824753556", "004085616") ?? "", /isn't used/);
+  });
+  await test("Pay Per Item: free by default, no subscription; fees only on first publish and relist", async () => {
+    const l = await db.listing.findFirstOrThrow({ where: { status: "ACTIVE", sellerId: seller.id } });
+    assert.equal((await feeSchedule(l.categoryId, seller.id)).listingFee, 0);
+    assert.equal(await chargeOnActivation(db, { ...l, publishedAt: null }, null), null); // free → no invoice
+    await db.setting.upsert({ where: { key: "fee_listing_cents" }, create: { key: "fee_listing_cents", value: "250" }, update: { value: "250" } });
+    await db.setting.upsert({ where: { key: "fee_relist_cents" }, create: { key: "fee_relist_cents", value: "100" }, update: { value: "100" } });
+    await db.category.update({ where: { id: l.categoryId }, data: { listingFee: 500 } }); // category override
+    try {
+      const first = await chargeOnActivation(db, { ...l, publishedAt: null, expiresAt: null }, null);
+      assert.equal(first?.type, "LISTING");
+      assert.equal(first?.amount, 500);
+      assert.equal(await chargeOnActivation(db, { ...l, publishedAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) }, null), null); // re-approval after edit
+      const relist = await chargeOnActivation(db, { ...l, publishedAt: new Date("2026-01-01"), expiresAt: new Date("2026-03-01") }, null);
+      assert.equal(relist?.type, "RELIST");
+      assert.equal(relist?.amount, 100);
+      const lines = describeFees(await feeSchedule(l.categoryId, seller.id));
+      assert.equal(lines.find((x) => x.label === "Monthly subscription")?.value, "None");
+    } finally {
+      await db.setting.deleteMany({ where: { key: { in: ["fee_listing_cents", "fee_relist_cents"] } } });
+      await db.category.update({ where: { id: l.categoryId }, data: { listingFee: null } });
+      await db.platformFee.deleteMany({ where: { listingId: l.id } });
+    }
+  });
+  await test("social links: https on the platform's own domain only; store addresses validated", async () => {
+    assert.equal((socialUrlProblem("instagram", "instagram.com/acme") as { url: string }).url, "https://instagram.com/acme");
+    assert.ok("error" in socialUrlProblem("instagram", "https://evil.example/instagram.com"));
+    assert.ok("error" in socialUrlProblem("facebook", "javascript:alert(1)"));
+    assert.ok("error" in socialUrlProblem("x", "https://user:pw@x.com/acme"));
+    assert.ok("error" in socialUrlProblem("tiktok", "https://tiktok.com/"));
+    assert.equal(storeSlugProblem("acme-trading"), null);
+    assert.ok(storeSlugProblem("admin"));
+    assert.ok(storeSlugProblem("Bad Slug"));
+    assert.ok(storeSlugProblem("-x"));
+  });
+  await test("referrals: utm/QR parsed and sanitised; AI search sources recognised", async () => {
+    assert.deepEqual(referralFromParams({ utm_source: "Facebook", utm_medium: "social", utm_campaign: "spring<script>" }), { source: "facebook", medium: "social", campaign: "springscript" });
+    assert.deepEqual(referralFromParams({ ref: "qr" }), { source: "qr", medium: "offline", campaign: null });
+    assert.equal(referralFromParams({}), null);
+    assert.ok(isAiSource("chatgpt.com"));
+    assert.ok(!isAiSource("facebook"));
+  });
+  await test("every listing and store gets a clean public URL (backfill is idempotent)", async () => {
+    await backfillPublicUrls(db);
+    assert.equal(await db.listing.count({ where: { slug: null } }), 0);
+    assert.equal(await db.sellerProfile.count({ where: { storeSlug: null } }), 0);
+    const again = await backfillPublicUrls(db);
+    assert.deepEqual(again, { listings: 0, stores: 0 });
   });
 
   console.log(`\n${passed} checks passed.`);

@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { createSession, destroySession, getCurrentUser, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { back, attempt } from "@/lib/action-utils";
 import { nextPublicId, normaliseEmail, passwordProblems } from "@/lib/ids";
-import { parseAuMobile, parseDob, postcodeMatchesState, STATE_CODES } from "@/lib/au-validation";
+import { validateMobile } from "@/lib/phone";
+import { parseDob, postcodeMatchesState, STATE_CODES } from "@/lib/au-validation";
 import { readSellerBusiness } from "@/lib/seller-business-form";
 import { consentProblem, localityOnly, MIN_SELLER_AGE, readConsent, readLocationForm, recordConsents, requestMeta, runBusinessCheck, saveSellerLocation } from "@/lib/seller-verification";
 import { optStr, str, ageOn } from "@/lib/format";
@@ -22,7 +23,7 @@ function readIdentity(fd: FormData, path: string, opts: { requireDob: boolean; s
   const firstName = str(fd.get("firstName"));
   const lastName = str(fd.get("lastName"));
   const email = normaliseEmail(str(fd.get("email")));
-  const mobile = parseAuMobile(str(fd.get("mobile")));
+  const mobile = validateMobile(str(fd.get("mobile")));
   const password = str(fd.get("password"));
   const dobRaw = str(fd.get("dateOfBirth"));
 
@@ -133,7 +134,7 @@ export async function registerSellerAction(fd: FormData) {
     if (cp) back(path, { error: cp });
     const sp = await db.$transaction(async (tx) => {
       const sellerCode = await nextPublicId(tx, biz.sellerType === "BUSINESS" ? "BUS" : "SEL");
-      const created = await tx.sellerProfile.create({ data: { userId: current.id, sellerCode, ...profileData } });
+      const created = await tx.sellerProfile.create({ data: { userId: current.id, sellerCode, storeSlug: sellerCode.toLowerCase(), ...profileData } });
       await tx.user.update({ where: { id: current.id }, data: { role: "SELLER", dateOfBirth: dob } });
       await recordConsents(current.id, consent, meta, tx);
       await audit(current.id, "SELLER_REGISTERED", "SellerProfile", sellerCode, { structure: biz.structure }, tx);
@@ -169,7 +170,7 @@ export async function registerSellerAction(fd: FormData) {
         riskFlags: flags.join(",") || null,
       },
     });
-    const created = await tx.sellerProfile.create({ data: { userId: u.id, sellerCode, ...profileData } });
+    const created = await tx.sellerProfile.create({ data: { userId: u.id, sellerCode, storeSlug: sellerCode.toLowerCase(), ...profileData } });
     await recordConsents(u.id, readConsent(fd), meta, tx);
     return { user: u, sp: created };
   });

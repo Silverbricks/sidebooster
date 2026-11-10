@@ -123,7 +123,7 @@ export function evaluateBusiness(input: {
         worse("MANUAL_REVIEW");
         problems.push(`Registered as "${rec.entityTypeName}", not a trust.`);
       }
-      if (structure === "INDIVIDUAL" && rec.entityTypeCode !== "IND") {
+      if ((structure === "INDIVIDUAL" || structure === "SOLE_TRADER") && rec.entityTypeCode !== "IND") {
         worse("MANUAL_REVIEW");
         problems.push(`ABN belongs to "${rec.entityTypeName}", not an individual / sole trader.`);
       }

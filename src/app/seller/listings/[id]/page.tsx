@@ -9,7 +9,9 @@ import { Badge, Flash, PageHeader, Section } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { LISTING_STATUS } from "@/lib/constants";
 import { dateTime } from "@/lib/format";
-import { listingStatusAction, saveListingAction } from "@/app/actions/seller";
+import { listingStatusAction, requestFeaturedAction, saveListingAction } from "@/app/actions/seller";
+import { feeDisclosure } from "@/lib/fee-disclosure";
+import { productPath } from "@/lib/urls";
 
 export const metadata = { title: "Manage product" };
 
@@ -28,7 +30,7 @@ export default async function EditListing({ params, searchParams }: { params: Pr
       <PageHeader
         title={l.title}
         subtitle={<><Badge status={l.status} labels={LISTING_STATUS} /> {l.statusReason && <span className="ml-2">Reason: {l.statusReason}</span>}</>}
-        actions={<Link href={`/listing/${l.id}`} className="btn-secondary">View</Link>}
+        actions={<Link href={productPath(l)} className="btn-secondary">View</Link>}
       />
       <Flash sp={sp} />
       <div className="flex flex-wrap gap-2">
@@ -38,6 +40,8 @@ export default async function EditListing({ params, searchParams }: { params: Pr
         ))}
         {l.category.highValue && ["ACTIVE", "PAUSED"].includes(l.status) && <Link href={`/seller/sales?listing=${l.id}`} className="btn-success btn-sm">Report sale</Link>}
         {l.status === "ACTIVE" && <Link href={`/seller/campaigns/new?listing=${l.id}`} className="btn-secondary btn-sm">🎟️ Request promotion</Link>}
+        {l.status === "ACTIVE" && !l.featured && <form action={requestFeaturedAction}><input type="hidden" name="id" value={l.id} /><SubmitButton className="btn-secondary btn-sm">⭐ Request featured placement</SubmitButton></form>}
+        {l.featured && <span className="self-center text-xs font-medium text-amber-700">⭐ Featured</span>}
       </div>
       {["ACTIVE", "PAUSED"].includes(l.status) && <p className="text-xs text-muted">Editing a published listing sends it back for approval.</p>}
       {editable ? (
@@ -45,6 +49,7 @@ export default async function EditListing({ params, searchParams }: { params: Pr
           categories={await categoriesForForm()}
           action={saveListingAction}
           canSubmit={canSubmitListings(user)}
+          fees={await feeDisclosure(l.sellerId)}
           initial={{ ...l, attrs: Object.fromEntries(l.attributes.map((a) => [a.attributeId, a.value])), images: l.images.map((i) => ({ id: i.id, url: i.url })) }}
         />
       ) : <p className="text-sm text-muted">This listing can no longer be edited.</p>}

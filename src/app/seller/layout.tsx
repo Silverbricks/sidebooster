@@ -29,6 +29,7 @@ export default async function SellerLayout({ children }: { children: React.React
         { href: "/seller/sales", label: "Completed sales" },
         { heading: "Finance" },
         { href: "/seller/commissions", label: "Payments & commission" },
+        { href: "/seller/marketing", label: "Marketing & sharing" },
         { heading: "Promotions" },
         { href: "/seller/campaigns", label: "Campaigns" },
         { href: "/seller/campaigns/new", label: "+ Request campaign" },

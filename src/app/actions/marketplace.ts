@@ -13,6 +13,8 @@ import { buyerRespondToSale } from "@/lib/commission";
 import { signTestEvent, testPaymentsAllowed } from "@/lib/payment-provider";
 import { handleWebhook } from "@/lib/payments";
 import { randomToken } from "@/lib/crypto";
+import { cookies } from "next/headers";
+import { referralFromCookie } from "@/lib/referrals";
 
 export async function enquiryAction(fd: FormData) {
   const listingId = str(fd.get("listingId"));
@@ -56,6 +58,9 @@ export async function checkoutAction(fd: FormData) {
       idempotencyKey: str(fd.get("idempotencyKey")) || randomToken(),
     });
     url = r.redirectUrl;
+    // first-touch referral attribution (first-party cookie set by ReferralCapture; no personal data)
+    const ref = referralFromCookie((await cookies()).get("sb_ref")?.value);
+    if (ref) await db.order.updateMany({ where: { payments: { some: { id: r.paymentId } }, referralSource: null }, data: { referralSource: ref.source, referralMedium: ref.medium, referralCampaign: ref.campaign } });
   } catch (e) {
     if (e instanceof CheckoutError) back(path, { error: e.message });
     throw e;

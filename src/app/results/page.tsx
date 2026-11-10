@@ -4,7 +4,7 @@ import { money, dateTime } from "@/lib/format";
 import { Empty, PublicStatusBadge } from "@/components/ui";
 import { publicStatus } from "@/lib/campaigns";
 
-export const metadata = { title: "Draw results", description: "Published, verifiable draw results." };
+export const metadata = { title: "Draw results", description: "Published, verifiable draw results.", alternates: { canonical: "/results" } };
 export const dynamic = "force-dynamic";
 
 export default async function ResultsPage() {

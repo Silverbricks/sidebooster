@@ -4,6 +4,7 @@ import { categoriesForForm } from "@/lib/listing-form-data";
 import { ListingForm } from "@/components/ListingForm";
 import { Flash, PageHeader } from "@/components/ui";
 import { saveListingAction } from "@/app/actions/seller";
+import { feeDisclosure } from "@/lib/fee-disclosure";
 
 export const metadata = { title: "Add product" };
 
@@ -14,7 +15,7 @@ export default async function NewListing({ searchParams }: { searchParams: Promi
     <div>
       <PageHeader title="Add a product" subtitle="Every listing is reviewed before it's published." />
       <Flash sp={sp} />
-      <ListingForm categories={await categoriesForForm()} action={saveListingAction} canSubmit={canSubmitListings(user)} initial={{ location: user.suburb ?? "", state: user.state, postcode: user.postcode, contactPhone: null }} />
+      <ListingForm categories={await categoriesForForm()} action={saveListingAction} canSubmit={canSubmitListings(user)} fees={await feeDisclosure(user.id)} initial={{ location: user.suburb ?? "", state: user.state, postcode: user.postcode, contactPhone: null }} />
     </div>
   );
 }

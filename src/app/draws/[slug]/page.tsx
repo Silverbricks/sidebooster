@@ -10,12 +10,13 @@ import { buyTicketsAction } from "@/app/actions/marketplace";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Flash, KV, Progress, PublicStatusBadge } from "@/components/ui";
 import { Gallery } from "@/components/Gallery";
+import { productPath } from "@/lib/urls";
 
 type P = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> };
 
 export async function generateMetadata({ params }: P): Promise<Metadata> {
   const c = await db.campaign.findUnique({ where: { slug: (await params).slug } });
-  return c ? { title: c.title, description: `${c.prizeName} — prize value ${money(c.prizeValue)}. Draw ${c.drawAt.toDateString()}.` } : {};
+  return c ? { title: c.title, description: `${c.prizeName} — prize value ${money(c.prizeValue)}. Draw ${c.drawAt.toDateString()}.`, alternates: { canonical: `/draws/${c.slug}` } } : {};
 }
 
 export default async function CampaignPage({ params, searchParams }: P) {
@@ -65,7 +66,7 @@ export default async function CampaignPage({ params, searchParams }: P) {
           <section className="card card-pad"><h2 className="h2 mb-2">About this promotion</h2><p className="whitespace-pre-line text-sm">{c.description}</p></section>
           <section className="card card-pad">
             <h2 className="h2 mb-3">Prize</h2>
-            <KV rows={[["Prize", c.prizeName], ["Prize value", money(c.prizeValue)], ["Delivery / collection", c.prizeDelivery], ...(c.listing ? [["Linked product", <Link key="l" className="link" href={`/listing/${c.listing.id}`}>{c.listing.title}</Link>] as [string, React.ReactNode]] : [])]} />
+            <KV rows={[["Prize", c.prizeName], ["Prize value", money(c.prizeValue)], ["Delivery / collection", c.prizeDelivery], ...(c.listing ? [["Linked product", <Link key="l" className="link" href={productPath(c.listing)}>{c.listing.title}</Link>] as [string, React.ReactNode]] : [])]} />
           </section>
           <section className="card card-pad">
             <h2 className="h2 mb-3">Key dates ({c.timezone})</h2>

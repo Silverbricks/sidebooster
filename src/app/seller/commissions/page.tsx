@@ -6,6 +6,7 @@ import { Badge, Empty, PageHeader, Section, Stat } from "@/components/ui";
 import { COMMISSION_STATUS } from "@/lib/constants";
 import { pct } from "@/lib/commission";
 import { getNumber } from "@/lib/settings";
+import { FEE_LABELS, type FeeType } from "@/lib/fees";
 
 export const metadata = { title: "Payments & commission" };
 
@@ -20,6 +21,7 @@ export default async function SellerCommissions() {
     getNumber("default_commission_bps"),
     db.payment.aggregate({ where: { ledger: "TICKET", sellerId: user.id, status: "SUCCEEDED" }, _sum: { amount: true } }),
   ]);
+  const fees = await db.platformFee.findMany({ where: { sellerId: user.id }, orderBy: { createdAt: "desc" }, take: 100 });
   const sum = (s: string[]) => records.filter((r) => s.includes(r.status)).reduce((a, r) => a + r.amount, 0);
   const sellerRule = rules.find((r) => r.sellerId === user.id);
   const months = [...new Set(records.map((r) => r.createdAt.toISOString().slice(0, 7)))];
@@ -45,6 +47,13 @@ export default async function SellerCommissions() {
             <tbody>{invoices.map((i) => <tr key={i.id}><td className="font-mono">{i.invoiceNumber}</td><td>{date(i.createdAt)}</td><td>{date(i.dueDate)}</td><td>{money(i.amount)}</td><td><Badge status={i.status} />{i.reference && <div className="text-xs text-muted">Ref {i.reference}</div>}</td></tr>)}</tbody></table>
         ) : <Empty>No invoices.</Empty>}
         <p className="mt-3 text-xs text-muted">Pay invoices by bank transfer quoting the invoice number. Payment details are on each emailed invoice.</p>
+      </Section>
+      <Section title="Platform fees (Pay Per Item)">
+        {fees.length ? (
+          <table className="table"><thead><tr><th>Invoice</th><th>Fee</th><th>Date</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>{fees.map((f) => <tr key={f.id}><td className="font-mono">{f.invoiceNumber}</td><td>{FEE_LABELS[f.type as FeeType] ?? f.type}<div className="text-xs text-muted">{f.description}</div></td><td>{date(f.createdAt)}</td><td>{date(f.dueDate)}</td><td>{money(f.amount)}</td><td><Badge status={f.status} /></td></tr>)}</tbody></table>
+        ) : <Empty>No platform fees. You&apos;re on Pay Per Item — there&apos;s no subscription.</Empty>}
+        <p className="mt-3 text-xs text-muted">Current fees are listed on the <a href="/pricing" className="link">seller pricing page</a> and shown before you publish each listing.</p>
       </Section>
       <Section title="Commission records">
         {records.length ? (

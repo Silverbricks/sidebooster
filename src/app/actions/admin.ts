@@ -4,17 +4,20 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { attempt, back } from "@/lib/action-utils";
-import { optStr, slugify, str } from "@/lib/format";
+import { optStr, slugify, str, toCents } from "@/lib/format";
 import { audit, drawAudit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
 import { refreshAccountStatus, refreshSellerStatus } from "@/lib/accounts";
 import { DEFAULT_SETTINGS, type SettingKey } from "@/lib/settings";
-import { LISTING_DAYS_ACTIVE } from "@/lib/constants";
+
 import { approveSchedule, campaignComplianceProblems, cancelCampaign, lockCampaign, markPrizeDelivered, publishResult, rejectSchedule, runDraw } from "@/lib/campaigns";
 import { adjustCommission, adminDecideSale, approveCommission, markInvoicePaid, reverseCommission, waiveCommission } from "@/lib/commission";
 import { completeOrder, processRefund } from "@/lib/payments";
 import { paymentProvider } from "@/lib/payment-provider";
 import { approvalProblems, refreshLocationStatus, runBusinessCheck } from "@/lib/seller-verification";
+import { chargeFee, chargeOnActivation, feeSchedule } from "@/lib/fees";
+import { newListingSlug } from "@/lib/urls";
+import { getNumber } from "@/lib/settings";
 
 const reasonOf = (fd: FormData) => optStr(fd.get("reason"));
 function needReason(r: string | null, path: string): asserts r is string {
@@ -185,7 +188,11 @@ export async function listingDecisionAction(fd: FormData) {
   if (["REJECT", "SUSPEND"].includes(decision)) needReason(reason, path);
   if (decision === "APPROVE") {
     if (!["APPROVED", "ACTIVE"].includes(l.seller.sellerProfile?.status ?? "") && l.seller.role !== "ADMIN") back(path, { error: "The seller is not approved — listings can't be published." });
-    await db.listing.update({ where: { id }, data: { status: "ACTIVE", statusReason: null, publishedAt: l.publishedAt ?? new Date(), expiresAt: new Date(Date.now() + LISTING_DAYS_ACTIVE * 86400_000) } });
+    const days = await getNumber("listing_days_active");
+    await db.$transaction(async (tx) => {
+      await tx.listing.update({ where: { id }, data: { status: "ACTIVE", statusReason: null, publishedAt: l.publishedAt ?? new Date(), expiresAt: new Date(Date.now() + days * 86400_000), ...(l.slug ? {} : { slug: newListingSlug(l.title) }) } });
+      if (l.seller.role !== "ADMIN") await chargeOnActivation(tx, l, admin.id); // listing fee (first publish) or relist fee (after expiry)
+    });
     await notify(l.sellerId, { type: "LISTING_APPROVED", title: `Listing approved: ${l.title}`, body: `Your listing is now live on ${brand.name}.`, link: `/listing/${l.id}` });
   } else if (decision === "REJECT") {
     await db.listing.update({ where: { id }, data: { status: "REJECTED", statusReason: reason } });
@@ -196,7 +203,13 @@ export async function listingDecisionAction(fd: FormData) {
   } else if (decision === "REINSTATE") {
     await db.listing.update({ where: { id }, data: { status: "PAUSED", statusReason: null } });
   } else if (decision === "FEATURE" || decision === "UNFEATURE") {
-    await db.listing.update({ where: { id }, data: { featured: decision === "FEATURE" } });
+    await db.$transaction(async (tx) => {
+      await tx.listing.update({ where: { id }, data: { featured: decision === "FEATURE" } });
+      if (decision === "FEATURE" && !l.featured && l.seller.role !== "ADMIN") {
+        const f = await feeSchedule(l.categoryId, l.sellerId, tx);
+        await chargeFee(tx, { sellerId: l.sellerId, listingId: l.id, type: "FEATURED", amount: f.featuredFee, description: `Featured placement: ${l.title}`, actorId: admin.id });
+      }
+    });
   } else back(path, { error: "Invalid decision." });
   await audit(admin.id, `LISTING_${decision}`, "Listing", id, null, db, reason);
   back(path, { ok: "Listing updated." });
@@ -221,12 +234,30 @@ export async function saveCategoryAction(fd: FormData) {
   const id = optStr(fd.get("id"));
   const name = str(fd.get("name"));
   if (!name) back("/admin/categories", { error: "Name required." });
-  const data = { name, slug: str(fd.get("slug")) || slugify(name), icon: optStr(fd.get("icon")), parentId: optStr(fd.get("parentId")), sortOrder: Number(fd.get("sortOrder")) || 0, active: fd.get("active") === "on", highValue: fd.get("highValue") === "on" };
+  const data = { name, slug: str(fd.get("slug")) || slugify(name), icon: optStr(fd.get("icon")), parentId: optStr(fd.get("parentId")), sortOrder: Number(fd.get("sortOrder")) || 0, active: fd.get("active") === "on", highValue: fd.get("highValue") === "on", listingFee: str(fd.get("listingFee")) === "" ? null : toCents(fd.get("listingFee")) };
+  if (data.listingFee !== null && Number.isNaN(data.listingFee)) back("/admin/categories", { error: "Listing fee must be a dollar amount, e.g. 2.50 (or blank for the default)." });
   await attempt("/admin/categories", async () => {
     const c = id ? await db.category.update({ where: { id }, data }) : await db.category.create({ data });
     await audit(admin.id, id ? "CATEGORY_UPDATED" : "CATEGORY_CREATED", "Category", c.id, data);
     return "Category saved.";
   });
+}
+
+/** Platform fee invoice: mark paid (reference), waive or cancel (reason required). */
+export async function platformFeeAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd.get("id"));
+  const op = str(fd.get("op"));
+  const path = str(fd.get("back")) || "/admin/commissions/fees";
+  const reason = reasonOf(fd);
+  const fee = await db.platformFee.findUniqueOrThrow({ where: { id } });
+  if (fee.status !== "DUE") back(path, { error: "Only due fees can be changed." });
+  if (op !== "paid") needReason(reason, path);
+  const status = { paid: "PAID", waive: "WAIVED", cancel: "CANCELLED" }[op];
+  if (!status) back(path, { error: "Invalid action." });
+  await db.platformFee.update({ where: { id }, data: { status, ...(op === "paid" ? { paidAt: new Date(), reference: reason } : { note: reason }) } });
+  await audit(admin.id, `PLATFORM_FEE_${status}`, "PlatformFee", id, { amount: fee.amount }, db, reason);
+  back(path, { ok: `Fee ${fee.invoiceNumber} ${status!.toLowerCase()}.` });
 }
 
 export async function saveAttributeAction(fd: FormData) {

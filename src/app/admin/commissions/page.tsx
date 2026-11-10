@@ -27,7 +27,7 @@ export default async function AdminCommissions({ searchParams }: { searchParams:
   const backTo = `/admin/commissions${sp.status ? `?status=${sp.status}` : ""}`;
   return (
     <div className="space-y-5">
-      <PageHeader title="Commissions" subtitle="Only approved sales generate commission. Every adjustment, waiver and reversal requires a reason and is audit-logged." actions={<><Link href="/admin/commissions/invoices" className="btn-secondary">Invoices</Link><Link href="/admin/commissions/rules" className="btn-secondary">Rates</Link></>} />
+      <PageHeader title="Commissions" subtitle="Only approved sales generate commission. Every adjustment, waiver and reversal requires a reason and is audit-logged." actions={<><Link href="/admin/commissions/invoices" className="btn-secondary">Invoices</Link><Link href="/admin/commissions/fees" className="btn-secondary">Platform fees</Link><Link href="/admin/commissions/rules" className="btn-secondary">Rates</Link></>} />
       <Flash sp={sp} />
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Pending approval" value={money(t(["PENDING_APPROVAL"]))} />

@@ -1,9 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { brand } from "@/config/brand";
+import { absoluteUrl } from "@/lib/urls";
 import { db } from "@/lib/db";
 import { ListingCard, CampaignCard } from "@/components/Cards";
 import { autoLockDue } from "@/lib/campaigns";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function Home() {
   await autoLockDue();
@@ -19,10 +24,14 @@ export default async function Home() {
 
   return (
     <div>
+      <JsonLd data={[
+        { "@context": "https://schema.org", "@type": "WebSite", name: brand.name, url: absoluteUrl("/"), potentialAction: { "@type": "SearchAction", target: `${absoluteUrl("/marketplace")}?q={search_term_string}`, "query-input": "required name=search_term_string" } },
+        { "@context": "https://schema.org", "@type": "Organization", name: brand.name, url: absoluteUrl("/"), logo: absoluteUrl("/logo.svg"), email: brand.supportEmail },
+      ]} />
       <section className="bg-gradient-to-br from-brand-700 to-brand-500 text-white">
         <div className="container-page grid gap-8 py-14 md:grid-cols-2 md:items-center">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">{hero?.title ?? "Buy and sell with verified Australians"}</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">{hero?.title ?? "Buy, Sell and Discover Great Deals on SideBooster"}</h1>
             <p className="mt-3 text-lg text-blue-100">{hero?.subtitle ?? "Every seller is ID-checked. Every listing is reviewed."}</p>
             <form action="/marketplace" className="mt-6 flex max-w-lg gap-2">
               <input name="q" className="input text-ink" placeholder="What are you looking for?" aria-label="Search" />

@@ -119,6 +119,10 @@ model SellerProfile {
   locationVerifiedById String?
   locationVerifiedAt   DateTime?
   locationMethod       String? // AUTO_DOCUMENT | MANUAL
+  // ---- public storefront (/store/<storeSlug>) — only public, seller-approved information
+  storeSlug            String?          @unique
+  publicLocation       String? // seller-chosen public area, e.g. "Inner West, Sydney NSW" (never the street address)
+  socialLinks          Json? // { facebook: { url, show }, instagram: … } validated https URLs
   // REGISTERED | VERIFICATION_PENDING | DOCUMENTS_REQUIRED | UNDER_REVIEW | APPROVED | ACTIVE | SUSPENDED | REJECTED | CLOSED
   status               String           @default("VERIFICATION_PENDING")
   statusReason         String?
@@ -173,6 +177,7 @@ model Category {
   sortOrder       Int                 @default(0)
   active          Boolean             @default(true)
   highValue       Boolean             @default(false) // cars/property: enquiry + reported sale, no online checkout
+  listingFee      Int? // Pay Per Item listing fee override in cents (null = platform default)
   listings        Listing[]           @relation("ListingCategory")
   subListings     Listing[]           @relation("ListingSubcategory")
   attributes      CategoryAttribute[]
@@ -201,6 +206,7 @@ model CategoryAttribute {
 
 model Listing {
   id             String             @id @default(cuid())
+  slug           String?            @unique // public URL /product/<slug>; stable once published
   sellerId       String
   seller         User               @relation("SellerListings", fields: [sellerId], references: [id])
   title          String
@@ -245,6 +251,8 @@ model Listing {
   campaigns      Campaign[]
   offers         Offer[]
   wishlistedBy   WishlistItem[]
+  fees           PlatformFee[]
+  referrals      ReferralEvent[]
 
   @@index([status, categoryId])
 }
@@ -337,30 +345,33 @@ model OfferUsage {
 // ---------------------------------------------------------------- orders, sales & commission
 
 model Order {
-  id              String      @id @default(cuid())
-  orderNumber     String      @unique
-  buyerId         String
-  buyer           User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  sellerId        String
-  seller          User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  id               String      @id @default(cuid())
+  orderNumber      String      @unique
+  buyerId          String
+  buyer            User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId         String
+  seller           User        @relation("SellerOrders", fields: [sellerId], references: [id])
   // PENDING_PAYMENT | PAID | FULFILLED | COMPLETED | CANCELLED | REFUNDED
-  status          String      @default("PENDING_PAYMENT")
-  subtotal        Int
-  discount        Int         @default(0)
-  deliveryFee     Int         @default(0)
-  total           Int
-  offerId         String?
-  shippingName    String?
-  shippingAddress String?
-  notes           String?
-  fulfilledAt     DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  items           OrderItem[]
-  payments        Payment[]
-  sale            Sale?
-  offerUsage      OfferUsage?
+  status           String      @default("PENDING_PAYMENT")
+  subtotal         Int
+  discount         Int         @default(0)
+  deliveryFee      Int         @default(0)
+  total            Int
+  offerId          String?
+  shippingName     String?
+  shippingAddress  String?
+  notes            String?
+  referralSource   String? // utm_source / referrer (e.g. facebook, chatgpt.com) — first-party, no personal data
+  referralMedium   String?
+  referralCampaign String?
+  fulfilledAt      DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  items            OrderItem[]
+  payments         Payment[]
+  sale             Sale?
+  offerUsage       OfferUsage?
 }
 
 model OrderItem {
@@ -769,4 +780,45 @@ model ContactMessage {
   email     String
   message   String
   createdAt DateTime @default(now())
+}
+
+/// Pay Per Item platform fees (listing, relist, featured, per-sale fixed fee). Invoiced to the seller; never a subscription.
+model PlatformFee {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  sellerId      String
+  listingId     String?
+  listing       Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  saleId        String?
+  type          String // LISTING | RELIST | FEATURED | SALE_FIXED
+  description   String
+  amount        Int // cents, incl. GST if applicable
+  status        String    @default("DUE") // DUE | PAID | WAIVED | CANCELLED
+  dueDate       DateTime
+  paidAt        DateTime?
+  reference     String?
+  note          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([sellerId, status])
+  @@index([type, createdAt])
+}
+
+/// First-party marketing events: tracked visits (utm / AI referrers) and share-button clicks. No IPs or personal data.
+model ReferralEvent {
+  id        String   @id @default(cuid())
+  kind      String // VISIT | SHARE
+  source    String // e.g. facebook, whatsapp, chatgpt.com, qr
+  medium    String?
+  campaign  String?
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  sellerId  String? // storefront owner (User.id)
+  path      String?
+  createdAt DateTime @default(now())
+
+  @@index([sellerId, createdAt])
+  @@index([listingId, createdAt])
+  @@index([source, createdAt])
 }

@@ -43,7 +43,7 @@ export function SellerTypeFields({ defaults = {}, showBio = true }: { defaults?:
           {Object.entries(BUSINESS_STRUCTURES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <p className="hint">
-          {structure === "INDIVIDUAL" ? "Seller ID SEL-xxxxxx. ABN only if you trade as a sole trader." : `Seller ID BUS-xxxxxx. ABN ${rule.abn}${rule.acn !== "none" ? `, ACN ${rule.acn}` : ""}.`}
+          {structure === "INDIVIDUAL" ? "Seller ID SEL-xxxxxx. For people selling their own items occasionally — no ABN needed." : structure === "SOLE_TRADER" ? "Seller ID SEL-xxxxxx. ABN required. No ACN is needed for sole traders." : `Seller ID BUS-xxxxxx. ABN ${rule.abn}${rule.acn !== "none" ? `, ACN ${rule.acn}` : ""}.`}
         </p>
       </div>
 

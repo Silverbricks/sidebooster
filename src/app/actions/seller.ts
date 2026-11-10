@@ -6,9 +6,12 @@ import { attempt, back } from "@/lib/action-utils";
 import { optStr, slugify, str, toCents } from "@/lib/format";
 import { audit, drawAudit } from "@/lib/audit";
 import { canSubmitListings } from "@/lib/accounts";
-import { getBool } from "@/lib/settings";
+import { getBool, getNumber } from "@/lib/settings";
+import { chargeOnActivation } from "@/lib/fees";
+import { newListingSlug, storeSlugProblem } from "@/lib/urls";
+import { readSocialLinks } from "@/lib/social";
 import { saveImages, savePrivateDocument, saveVideo, UploadError } from "@/lib/uploads";
-import { LISTING_DAYS_ACTIVE, DOCUMENT_TYPES, TIMEZONES } from "@/lib/constants";
+import { DOCUMENT_TYPES, TIMEZONES } from "@/lib/constants";
 import { zonedToUtc } from "@/lib/time";
 import { campaignComplianceProblems } from "@/lib/campaigns";
 import { reportOfflineSale } from "@/lib/commission";
@@ -126,8 +129,23 @@ export async function completeTestOnboardingAction(fd: FormData) {
 
 export async function updateSellerProfileAction(fd: FormData) {
   const user = await requireSeller();
-  await db.sellerProfile.update({ where: { userId: user.id }, data: { bio: optStr(fd.get("bio")), businessName: optStr(fd.get("businessName")) } });
-  back("/seller/profile", { ok: "Profile updated." });
+  const path = "/seller/profile";
+  if (!user.sellerProfile) back(path, { error: "No seller profile." });
+  const storeSlug = str(fd.get("storeSlug")).toLowerCase() || user.sellerProfile!.sellerCode.toLowerCase();
+  const slugErr = storeSlugProblem(storeSlug);
+  if (slugErr) back(path, { error: slugErr });
+  const taken = await db.sellerProfile.findFirst({ where: { storeSlug, NOT: { id: user.sellerProfile!.id } }, select: { id: true } });
+  if (taken) back(path, { error: "That store address is already taken." });
+  const publicLocation = optStr(fd.get("publicLocation"))?.slice(0, 80) ?? null;
+  if (publicLocation && /\d{1,5}\s+\w+\s+(st|street|rd|road|ave|avenue|dr|drive|ct|court|pl|place|cres|crescent|hwy|highway|ln|lane|way|tce|terrace|blvd|pde|parade)\b/i.test(publicLocation))
+    back(path, { error: "Don't put a street address in your public area — use a suburb, region or service area." });
+  const social = readSocialLinks(fd);
+  if (social.error) back(path, { error: social.error });
+  const businessName = optStr(fd.get("businessName"))?.slice(0, 80) ?? null;
+  const bio = optStr(fd.get("bio"))?.slice(0, 2000) ?? null;
+  await db.sellerProfile.update({ where: { userId: user.id }, data: { bio, businessName, storeSlug, publicLocation, socialLinks: social.links as Prisma.InputJsonValue } });
+  await audit(user.id, "SELLER_PROFILE_UPDATED", "SellerProfile", user.sellerProfile!.id, { storeSlug, socialLinks: Object.keys(social.links) });
+  back(path, { ok: "Profile updated." });
 }
 
 // ---------------------------------------------------------------- listings
@@ -215,12 +233,18 @@ export async function saveListingAction(fd: FormData) {
     availability: str(fd.get("availability")) || "AVAILABLE",
     seoTitle: optStr(fd.get("seoTitle")), seoDescription: optStr(fd.get("seoDescription")), keywords: optStr(fd.get("keywords")),
     videoUrl, status, publishedAt,
-    expiresAt: status === "ACTIVE" ? new Date(Date.now() + LISTING_DAYS_ACTIVE * 86400_000) : existing?.expiresAt ?? null,
+    expiresAt: status === "ACTIVE" ? new Date(Date.now() + (await getNumber("listing_days_active")) * 86400_000) : existing?.expiresAt ?? null,
     statusReason: intent === "submit" ? null : existing?.statusReason ?? null,
   };
 
   const listing = await db.$transaction(async (tx) => {
-    const l = existing ? await tx.listing.update({ where: { id: existing.id }, data }) : await tx.listing.create({ data: { ...data, sellerId: user.id } });
+    const l = existing
+      ? await tx.listing.update({ where: { id: existing.id }, data: { ...data, ...(existing.slug ? {} : { slug: newListingSlug(title) }) } })
+      : await tx.listing.create({ data: { ...data, slug: newListingSlug(title), sellerId: user.id } });
+    // Pay Per Item: listing/relist fee when it goes live (auto-approved path); disclosed on the form beforehand
+    if (status === "ACTIVE" && existing?.status !== "ACTIVE" && user.role !== "ADMIN") {
+      await chargeOnActivation(tx, existing ?? { id: l.id, sellerId: user.id, title, categoryId, publishedAt: null, expiresAt: null }, user.id);
+    }
     if (removeIds.length) await tx.listingImage.deleteMany({ where: { listingId: l.id, id: { in: removeIds } } });
     const start = existing ? existing.images.length : 0;
     for (const [i, url] of newImages.entries()) await tx.listingImage.create({ data: { listingId: l.id, url, sortOrder: start + i } });
@@ -239,6 +263,22 @@ export async function saveListingAction(fd: FormData) {
 
   const msg = status === "PENDING" ? "Submitted for approval — you'll be notified once it's reviewed." : status === "ACTIVE" ? "Listing published." : "Draft saved.";
   back(`/seller/listings/${listing.id}`, { ok: msg });
+}
+
+/** Seller asks for featured placement; an admin decides (the featured fee, if any, is charged on approval). */
+export async function requestFeaturedAction(fd: FormData) {
+  const user = await requireSeller();
+  const id = str(fd.get("id"));
+  const path = `/seller/listings/${id}`;
+  const l = await db.listing.findUnique({ where: { id } });
+  if (!l || l.sellerId !== user.id) back("/seller/listings", { error: "Not found." });
+  if (l!.status !== "ACTIVE") back(path, { error: "Only live listings can be featured." });
+  if (l!.featured) back(path, { error: "This listing is already featured." });
+  if (!rateLimit(`feat:${id}`, 2, 86_400_000)) back(path, { error: "You've already requested this recently." });
+  await audit(user.id, "LISTING_FEATURE_REQUESTED", "Listing", id);
+  const admins = await db.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+  for (const a of admins) await notify(a.id, { type: "FEATURE_REQUEST", title: `Featured placement requested: ${l!.title}`, body: `Seller ${user.sellerProfile?.sellerCode ?? user.publicId}`, link: `/admin/listings?q=${encodeURIComponent(l!.title)}`, email: false });
+  back(path, { ok: "Request sent. You'll be notified when it's reviewed." });
 }
 
 export async function listingStatusAction(fd: FormData) {

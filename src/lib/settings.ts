@@ -13,6 +13,23 @@ export const DEFAULT_SETTINGS = {
   payment_expiry_minutes: "30",
   max_tickets_per_order: "50",
 
+  // Pay Per Item seller pricing (cents; 0 = free). Category listing-fee overrides are set per category.
+  fee_listing_cents: "0",
+  fee_relist_cents: "0",
+  fee_featured_cents: "0",
+  fee_sale_fixed_cents: "0",
+  listing_days_active: "60",
+
+  // SEO & discovery
+  seo_home_title: "SideBooster – Buy & Sell Online in Australia | Deals & Products",
+  seo_home_description: "Discover SideBooster, an online marketplace to buy and sell products in Australia. Explore deals, discover sellers, list products and shop online.",
+  seo_google_site_verification: "",
+  seo_bing_site_verification: "",
+  seo_gtm_container_id: "",
+  crawler_allow_oai_searchbot: "true",
+  crawler_allow_gptbot: "false",
+  crawler_allow_google_extended: "false",
+
   // promotions / legal (SRS §17). Paid draws stay OFF until Australian legal advice is obtained.
   paid_draws_enabled: "false",
   free_draws_enabled: "true",
@@ -46,6 +63,9 @@ export const SETTING_LABELS: Partial<Record<SettingKey, [string, string]>> = {
   rule_sold_out_trigger_allowed: ["Allow sold-out draw trigger", "Only enable if your approved campaign terms permit drawing on sell-out."],
   paid_draws_enabled: ["Enable paid ticket campaigns", "Keep OFF until Australian gaming/trade-promotion legal advice confirms the model."],
   free_draws_enabled: ["Enable free-entry campaigns", ""],
+  crawler_allow_oai_searchbot: ["Allow ChatGPT Search (OAI-SearchBot)", "Lets public pages appear in ChatGPT search results. Doesn't guarantee inclusion."],
+  crawler_allow_gptbot: ["Allow GPTBot (OpenAI model training)", "Separate from ChatGPT Search. Off = public pages aren't used to train OpenAI models."],
+  crawler_allow_google_extended: ["Allow Google-Extended (Gemini training)", "Doesn't affect Google Search ranking or indexing."],
 };
 
 export async function getSettings(): Promise<Record<SettingKey, string>> {

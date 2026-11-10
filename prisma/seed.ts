@@ -1,5 +1,6 @@
 /* Seed data for local development. Run: npm run db:seed (wipes and recreates demo data). */
 import { PrismaClient } from "@prisma/client";
+import { backfillPublicUrls } from "./backfill-urls";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 
@@ -165,4 +166,6 @@ async function seedTickets(campaignId: string, holders: [string, number][], tota
   await db.campaign.update({ where: { id: campaignId }, data: { nextTicketNumber: n, ticketsAllocated: n - 1 } });
 }
 
-main().finally(() => db.$disconnect());
+main()
+  .then(() => backfillPublicUrls(db))
+  .finally(() => db.$disconnect());

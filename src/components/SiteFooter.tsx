@@ -5,7 +5,7 @@ import { Logo } from "@/components/branding/Logo";
 const COLS: [string, [string, string][]][] = [
   ["Marketplace", [["All listings", "/marketplace"], ["Cars & Vehicles", "/marketplace/cars-vehicles"], ["Property", "/marketplace/property-real-estate"], ["Mobiles", "/marketplace/mobile-phones"], ["Electronics", "/marketplace/electronics"]]],
   ["Promotions", [["Tickets & Draws", "/draws"], ["Upcoming draws", "/draws?tab=upcoming"], ["Previous draws", "/draws?tab=previous"], ["Draw results", "/results"]]],
-  ["Account", [["Buyer registration", "/register"], ["Seller registration", "/register/seller"], ["Log in", "/login"]]],
+  ["Sell", [["Seller pricing", "/pricing"], ["Seller registration", "/register/seller"], ["Buyer registration", "/register"], ["Log in", "/login"]]],
   ["Company", [["About us", "/about"], ["Contact us", "/contact"], ["Terms & Conditions", "/terms"], ["Privacy Policy", "/privacy"], ["Refund Policy", "/refund-policy"], ["Responsible Participation", "/responsible-participation"]]],
 ];
 

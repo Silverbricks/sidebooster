@@ -82,7 +82,8 @@ export const abnContainsAcn = (abn: string, acn: string) => digitsOnly(abn).slic
 // ------------------------------------------------------------------ business structure
 
 export const BUSINESS_STRUCTURES = {
-  INDIVIDUAL: { label: "Individual / Sole Trader", abn: "optional", acn: "none", business: false },
+  INDIVIDUAL: { label: "Individual (occasional seller)", abn: "optional", acn: "none", business: false },
+  SOLE_TRADER: { label: "Sole Trader", abn: "required", acn: "none", business: false },
   REGISTERED_BUSINESS: { label: "Registered Business", abn: "required", acn: "none", business: true },
   COMPANY: { label: "Australian Company (Pty Ltd)", abn: "required", acn: "required", business: true },
   PARTNERSHIP: { label: "Partnership", abn: "required", acn: "none", business: true },

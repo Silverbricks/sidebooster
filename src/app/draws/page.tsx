@@ -6,7 +6,7 @@ import { autoLockDue } from "@/lib/campaigns";
 import { CampaignCard } from "@/components/Cards";
 import { Empty } from "@/components/ui";
 
-export const metadata = { title: "Tickets & Draws", description: "Approved prize promotions from verified sellers, with auditable draws." };
+export const metadata = { title: "Tickets & Draws", description: "Approved prize promotions from verified sellers, with auditable draws.", alternates: { canonical: "/draws" } };
 export const dynamic = "force-dynamic";
 
 const TABS = [

@@ -8,7 +8,7 @@ const CMS = ["about", "contact", "terms", "privacy", "refund-policy", "responsib
 
 export async function generateMetadata({ params }: { params: Promise<{ page: string }> }) {
   const p = await db.page.findUnique({ where: { slug: (await params).page } });
-  return p ? { title: p.title } : {};
+  return p ? { title: p.title, description: p.content.replace(/[#*_>\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 155), alternates: { canonical: `/${p.slug}` } } : {};
 }
 
 export default async function CmsPage({ params, searchParams }: { params: Promise<{ page: string }>; searchParams: Promise<Record<string, string>> }) {

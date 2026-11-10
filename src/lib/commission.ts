@@ -185,6 +185,12 @@ async function generateCommission(tx: Tx, commissionId: string, actorId: string 
     include: { sale: true },
   });
   await audit(actorId, "COMMISSION_GENERATED", "Commission", rec.id, { amount: rec.amount }, tx);
+  // Pay Per Item fixed per-sale fee (admin setting, default 0 = none), invoiced separately from the commission
+  const fixed = await getNumber("fee_sale_fixed_cents", tx);
+  if (fixed > 0) {
+    const { chargeFee } = await import("./fees"); // lazy: fees.ts imports this module
+    await chargeFee(tx, { sellerId: rec.sellerId, saleId: rec.saleId, type: "SALE_FIXED", amount: fixed, description: `Per-sale fee: sale ${rec.sale.saleNumber}`, actorId });
+  }
   if (rec.settlement === "INVOICE") {
     if (rec.amount === 0) return;
     const days = await getNumber("commission_invoice_due_days", tx);

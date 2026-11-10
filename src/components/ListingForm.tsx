@@ -13,7 +13,9 @@ type Initial = {
 
 const dollars = (c?: number | null) => (c == null ? "" : (c / 100).toFixed(2).replace(/\.00$/, ""));
 
-export function ListingForm({ categories, initial, action, canSubmit }: { categories: Cat[]; initial?: Initial; action: (fd: FormData) => void; canSubmit: boolean }) {
+type FeeLine = { label: string; value: string; note: string };
+
+export function ListingForm({ categories, initial, action, canSubmit, fees }: { categories: Cat[]; initial?: Initial; action: (fd: FormData) => void; canSubmit: boolean; fees?: Record<string, FeeLine[]> }) {
   const [step, setStep] = useState(0);
   const [catId, setCatId] = useState(initial?.categoryId ?? "");
   const [subId, setSubId] = useState(initial?.subcategoryId ?? "");
@@ -173,6 +175,17 @@ export function ListingForm({ categories, initial, action, canSubmit }: { catego
             <div><label className="label" htmlFor="keywords">Keywords</label><input id="keywords" name="keywords" className="input" value={seo.keywords} onChange={(e) => setSeo({ ...seo, keywords: e.target.value })} /></div>
           </div>
         </details>
+        {fees && (fees[subId] ?? fees[catId] ?? fees[""]) && (
+          <div className="rounded-lg border border-line bg-slate-50 p-4 text-sm">
+            <div className="mb-2 font-semibold">Fees for this listing — Pay Per Item, no subscription</div>
+            <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+              {(fees[subId] ?? fees[catId] ?? fees[""])!.map((f) => (
+                <div key={f.label} className="contents"><dt className="text-muted">{f.label}</dt><dd><b>{f.value}</b> <span className="text-xs text-muted">{f.note}</span></dd></div>
+              ))}
+            </dl>
+            <p className="mt-2 text-xs text-muted">By submitting you agree to these fees. Card/payment-provider processing fees are separate. See <a href="/pricing" target="_blank" className="link">seller pricing</a>.</p>
+          </div>
+        )}
         <p className="text-sm text-muted">Offers & discounts are managed under <b>Offers</b>. Once this product is approved you can request a promotion campaign for it.</p>
         <div className="flex flex-wrap justify-between gap-2">
           <button type="button" className="btn-secondary" onClick={() => setStep(1)}>← Back</button>

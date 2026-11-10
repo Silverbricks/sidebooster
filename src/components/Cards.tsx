@@ -3,6 +3,7 @@ import type { Campaign, Category, Listing, ListingImage, CampaignImage } from "@
 import { money, dateTime } from "@/lib/format";
 import { publicStatus } from "@/lib/campaigns";
 import { Progress, PublicStatusBadge } from "./ui";
+import { productPath } from "@/lib/urls";
 
 export function Thumb({ src, icon, alt, className = "aspect-[4/3]" }: { src?: string | null; icon?: string | null; alt: string; className?: string }) {
   return src ? (
@@ -15,7 +16,7 @@ export function Thumb({ src, icon, alt, className = "aspect-[4/3]" }: { src?: st
 
 export function ListingCard({ l }: { l: Listing & { images: ListingImage[]; category: Category } }) {
   return (
-    <Link href={`/listing/${l.id}`} className="card group flex flex-col overflow-hidden transition hover:shadow-md">
+    <Link href={productPath(l)} className="card group flex flex-col overflow-hidden transition hover:shadow-md">
       <Thumb src={l.images[0]?.url} icon={l.category.icon} alt={l.title} />
       <div className="flex flex-1 flex-col p-4">
         <div className="text-xs text-muted">{l.category.name} · {l.location}{l.state ? `, ${l.state}` : ""}</div>

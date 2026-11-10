@@ -10,14 +10,15 @@ export default async function AdminCategories({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const roots = await db.category.findMany({ where: { parentId: null }, orderBy: { sortOrder: "asc" }, include: { children: { orderBy: { sortOrder: "asc" }, include: { _count: { select: { attributes: true, subListings: true } } } }, _count: { select: { attributes: true, listings: true } } } });
   const editing = sp.edit ? await db.category.findUnique({ where: { id: sp.edit }, include: { attributes: { orderBy: { sortOrder: "asc" } } } }) : null;
-  const CatForm = ({ c }: { c?: { id: string; name: string; slug: string; icon: string | null; parentId: string | null; sortOrder: number; active: boolean; highValue: boolean } }) => (
-    <form action={saveCategoryAction} className="grid gap-2 sm:grid-cols-[1fr_1fr_70px_1fr_70px_auto] sm:items-end">
+  const CatForm = ({ c }: { c?: { id: string; name: string; slug: string; icon: string | null; parentId: string | null; sortOrder: number; active: boolean; highValue: boolean; listingFee: number | null } }) => (
+    <form action={saveCategoryAction} className="grid gap-2 sm:grid-cols-[1fr_1fr_70px_1fr_70px_100px_auto] sm:items-end">
       {c && <input type="hidden" name="id" value={c.id} />}
       <div><label className="label">Name</label><input name="name" defaultValue={c?.name} className="input" required /></div>
       <div><label className="label">Slug</label><input name="slug" defaultValue={c?.slug} className="input" /></div>
       <div><label className="label">Icon</label><input name="icon" defaultValue={c?.icon ?? ""} className="input" /></div>
       <div><label className="label">Parent</label><select name="parentId" defaultValue={c?.parentId ?? ""} className="input"><option value="">— top level —</option>{roots.filter((r) => r.id !== c?.id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
       <div><label className="label">Order</label><input name="sortOrder" type="number" defaultValue={c?.sortOrder ?? 0} className="input" /></div>
+      <div><label className="label" title="Pay Per Item listing fee for this category. Blank = platform default (Settings).">Listing fee $</label><input name="listingFee" defaultValue={c?.listingFee != null ? (c.listingFee / 100).toFixed(2) : ""} className="input" placeholder="default" inputMode="decimal" /></div>
       <div className="flex items-center gap-3 text-xs">
         <label className="flex items-center gap-1"><input type="checkbox" name="active" defaultChecked={c?.active ?? true} />Active</label>
         <label className="flex items-center gap-1" title="Enquiry + reported sale only"><input type="checkbox" name="highValue" defaultChecked={c?.highValue} />High value</label>
