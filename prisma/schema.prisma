@@ -21,65 +21,143 @@ model Counter {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  publicId         String    @unique // BUY-000001 / SEL-000001 / BUS-000001 / ADM-000001 (backend-generated, immutable)
-  email            String    @unique // stored normalised (trimmed, lower-case)
-  passwordHash     String
-  firstName        String
-  lastName         String
-  name             String // full name, kept in sync
-  displayName      String? // public name if they win a draw
-  mobile           String?   @unique
-  role             String    @default("BUYER") // BUYER | SELLER | ADMIN
+  id                String    @id @default(cuid())
+  publicId          String    @unique // BUY-000001 / SEL-000001 / BUS-000001 / ADM-000001 (backend-generated, immutable)
+  email             String    @unique // stored normalised (trimmed, lower-case)
+  username          String?   @unique // optional sign-in name, stored lower-case
+  passwordHash      String
+  passwordChangedAt DateTime?
+  failedLogins      Int       @default(0) // consecutive failed password/code attempts (reset on success)
+  lockedUntil       DateTime? // progressive lockout
+  firstName         String
+  lastName          String
+  name              String // full name, kept in sync
+  displayName       String? // public name if they win a draw
+  mobile            String?   @unique
+  role              String    @default("BUYER") // BUYER | SELLER | ADMIN
   // REGISTERED | EMAIL_PENDING | MOBILE_PENDING | ACTIVE | VERIFICATION_REQUIRED | RESTRICTED | SUSPENDED | CLOSED
-  accountStatus    String    @default("EMAIL_PENDING")
-  statusReason     String?
-  emailVerifiedAt  DateTime?
-  emailVerifyToken String?   @unique
-  mobileVerifiedAt DateTime?
-  mobileOtpHash    String?
-  mobileOtpExpires DateTime?
-  mobileOtpTries   Int       @default(0)
-  idVerifiedAt     DateTime?
-  termsAcceptedAt  DateTime?
-  country          String    @default("AU")
-  state            String?
-  suburb           String?
-  postcode         String?
-  dateOfBirth      DateTime?
-  riskFlags        String? // comma separated flags from duplicate/risk screening
-  marketingOptIn   Boolean   @default(false) // separate, optional consent (never bundled with Terms)
-  marketingOptInAt DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  accountStatus     String    @default("EMAIL_PENDING")
+  statusReason      String?
+  emailVerifiedAt   DateTime?
+  emailVerifyToken  String?   @unique
+  mobileVerifiedAt  DateTime?
+  mobileOtpHash     String?
+  mobileOtpExpires  DateTime?
+  mobileOtpTries    Int       @default(0)
+  idVerifiedAt      DateTime?
+  termsAcceptedAt   DateTime?
+  country           String    @default("AU")
+  state             String?
+  suburb            String?
+  postcode          String?
+  dateOfBirth       DateTime?
+  riskFlags         String? // comma separated flags from duplicate/risk screening
+  marketingOptIn    Boolean   @default(false) // separate, optional consent (never bundled with Terms)
+  marketingOptInAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  sessions        Session[]
-  sellerProfile   SellerProfile?
-  listings        Listing[]        @relation("SellerListings")
-  enquiriesSent   Enquiry[]        @relation("BuyerEnquiries")
-  enquiriesRecv   Enquiry[]        @relation("SellerEnquiries")
-  ordersPlaced    Order[]          @relation("BuyerOrders")
-  ordersReceived  Order[]          @relation("SellerOrders")
-  payments        Payment[]
-  campaigns       Campaign[]       @relation("SellerCampaigns")
-  tickets         Ticket[]
-  ticketPurchases TicketPurchase[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  salesAsBuyer    Sale[]           @relation("SaleBuyer")
-  salesAsSeller   Sale[]           @relation("SaleSeller")
-  wishlist        WishlistItem[]
-  pushTokens      PushToken[]
-  consents        ConsentRecord[]
+  sessions         Session[]
+  sellerProfile    SellerProfile?
+  listings         Listing[]         @relation("SellerListings")
+  enquiriesSent    Enquiry[]         @relation("BuyerEnquiries")
+  enquiriesRecv    Enquiry[]         @relation("SellerEnquiries")
+  ordersPlaced     Order[]           @relation("BuyerOrders")
+  ordersReceived   Order[]           @relation("SellerOrders")
+  payments         Payment[]
+  campaigns        Campaign[]        @relation("SellerCampaigns")
+  tickets          Ticket[]
+  ticketPurchases  TicketPurchase[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  salesAsBuyer     Sale[]            @relation("SaleBuyer")
+  salesAsSeller    Sale[]            @relation("SaleSeller")
+  wishlist         WishlistItem[]
+  pushTokens       PushToken[]
+  consents         ConsentRecord[]
+  authCodes        AuthCode[]
+  loginEvents      LoginEvent[]
+  recoveryRequests RecoveryRequest[] @relation("RecoveryUser")
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  persistent Boolean  @default(true) // "Remember me" — false = browser-session cookie, short server expiry
+  method     String   @default("PASSWORD") // PASSWORD | EMAIL_CODE | RESET
+  ip         String?
+  userAgent  String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// One-time codes and single-use links (login, recovery, email change). Only hashes are stored.
+model AuthCode {
+  id         String    @id @default(cuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose    String // LOGIN | RESET | USERNAME | MOBILE_RECOVERY | NEW_EMAIL | RESET_LINK | EMAIL_CHANGE_OLD | EMAIL_CHANGE_NEW | EMAIL_CHANGE_LINK
+  channel    String // EMAIL | SMS
+  target     String // address/number the code was sent to (normalised)
+  codeHash   String    @unique
+  attempts   Int       @default(0)
+  sends      Int       @default(1)
+  lastSentAt DateTime  @default(now())
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  consumedAt DateTime?
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, purpose])
+}
+
+/// Sign-in attempts (successful and failed) for login history, lockout and suspicious-login alerts.
+model LoginEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  identifier String // masked email/username as typed
+  method     String // PASSWORD | EMAIL_CODE | RESET
+  success    Boolean
+  reason     String? // BAD_PASSWORD | BAD_CODE | LOCKED | BLOCKED | UNKNOWN
+  ip         String?
+  userAgent  String?
+  deviceId   String? // random first-party device cookie, used to spot sign-ins from new devices
+  newDevice  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([ip, createdAt])
+}
+
+/// Lost-email recovery requests reviewed by an admin.
+model RecoveryRequest {
+  id               String    @id @default(cuid())
+  reference        String    @unique // REC-XXXXXX
+  kind             String // MOBILE_VERIFIED | IDENTITY
+  userId           String?
+  user             User?     @relation("RecoveryUser", fields: [userId], references: [id], onDelete: SetNull)
+  identifier       String // what the requester typed (username / account ID / mobile)
+  fullName         String?
+  newEmail         String
+  newEmailVerified Boolean   @default(false)
+  mobileVerified   Boolean   @default(false)
+  details          String?
+  status           String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  decisionNote     String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  ip               String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model SellerProfile {

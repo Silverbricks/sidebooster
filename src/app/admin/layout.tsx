@@ -1,10 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { DashboardShell } from "@/components/DashboardShell";
 import { approvalCounts } from "@/lib/admin-counts";
+import { db } from "@/lib/db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
-  const n = await approvalCounts();
+  const [n, recoveryPending] = await Promise.all([approvalCounts(), db.recoveryRequest.count({ where: { status: "PENDING" } })]);
   return (
     <DashboardShell
       title="Super Admin"
@@ -35,6 +36,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         { href: "/admin/reports", label: "Reports" },
         { href: "/admin/cms", label: "CMS / pages" },
         { href: "/admin/settings", label: "Settings & approval rules" },
+        { href: "/admin/recovery", label: "Account recovery", badge: recoveryPending },
         { href: "/admin/audit", label: "Audit log" },
         { href: "/admin/messages", label: "Email / SMS outbox" },
       ]}

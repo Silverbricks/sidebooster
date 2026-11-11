@@ -4,7 +4,7 @@ import { seoSettings } from "@/lib/seo";
 // read APP_URL + crawler policy at request time (the Docker image is built before the domain is known)
 export const dynamic = "force-dynamic";
 
-const PRIVATE = ["/admin", "/seller", "/account", "/api", "/pay", "/checkout", "/verify", "/verify-email", "/login", "/go"];
+const PRIVATE = ["/admin", "/seller", "/account", "/api", "/pay", "/checkout", "/verify", "/verify-email", "/login", "/go", "/forgot-password", "/forgot-username", "/forgot-email", "/reset-password", "/verify-email-change"];
 
 /**
  * Crawl guidance only — robots.txt is not access control; private pages are protected by login/authorisation

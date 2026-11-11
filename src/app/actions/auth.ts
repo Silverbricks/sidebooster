@@ -2,7 +2,10 @@
 import { brand } from "@/config/brand";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { createSession, destroySession, getCurrentUser, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
+import { burnPasswordCheck, createSession, destroySession, getCurrentUser, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
+import { findByIdentifier } from "@/lib/auth-codes";
+import { lockedFor, loginAlert, recordLogin, registerFailure, registerSuccess } from "@/lib/login-security";
+import { landing } from "@/lib/sign-in";
 import { back, attempt } from "@/lib/action-utils";
 import { nextPublicId, normaliseEmail, passwordProblems } from "@/lib/ids";
 import { validateMobile } from "@/lib/phone";
@@ -63,7 +66,7 @@ async function assertUnique(email: string, mobile: string, path: string) {
 async function sendVerificationEmail(userId: string, email: string) {
   const token = randomToken();
   await db.user.update({ where: { id: userId }, data: { emailVerifyToken: token } });
-  await sendEmail(email, `Verify your ${brand.name} email`, `Welcome to ${brand.name}!\n\nVerify your email address:\n${appUrl(`/verify-email?token=${token}`)}`);
+  await sendEmail(email, `Verify your ${brand.name} email`, `Welcome to ${brand.name}!\n\nVerify your email address:\n${appUrl(`/verify-email?token=${token}`)}`, db, { sensitive: true });
 }
 
 export async function registerBuyerAction(fd: FormData) {
@@ -183,22 +186,47 @@ export async function registerSellerAction(fd: FormData) {
   redirect("/verify");
 }
 
+const LOGIN_FAILED = "Incorrect email/username or password.";
+
 export async function loginAction(fd: FormData) {
-  const email = normaliseEmail(str(fd.get("email")));
+  const identifier = str(fd.get("identifier") ?? fd.get("email"));
   const password = str(fd.get("password"));
+  const remember = fd.get("remember") === "on";
   const next = str(fd.get("next"));
   const path = `/login${next ? `?next=${encodeURIComponent(next)}` : ""}`;
   const ip = await clientIp();
-  if (!rateLimit(`login:${ip}`, 20, 15 * 60_000) || !rateLimit(`login:${email}`, 8, 15 * 60_000))
-    back(path, { error: "Too many attempts. Please wait 15 minutes." });
-  const user = await db.user.findUnique({ where: { email } });
-  if (!user || !(await verifyPassword(password, user.passwordHash))) back(path, { error: "Incorrect email or password." });
-  if (["SUSPENDED", "CLOSED"].includes(user!.accountStatus)) back(path, { error: `This account is ${user!.accountStatus.toLowerCase()}. Contact support.` });
-  await createSession(user!.id);
-  await audit(user!.id, "LOGIN", "User", user!.id, { ip });
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : null;
-  if (user!.accountStatus === "EMAIL_PENDING" || user!.accountStatus === "MOBILE_PENDING") redirect("/verify");
-  redirect(safeNext ?? (user!.role === "ADMIN" ? "/admin" : user!.role === "SELLER" ? "/seller" : "/account"));
+  const key = identifier.toLowerCase();
+  if (!rateLimit(`login:${ip}`, 20, 15 * 60_000) || !rateLimit(`login:${key}`, 10, 15 * 60_000))
+    back(path, { error: "Too many sign-in attempts. Please wait 15 minutes, or sign in with an email code." });
+  if (!identifier || !password) back(path, { error: "Enter your email or username and your password." });
+
+  const user = await findByIdentifier(identifier);
+  if (!user) {
+    await burnPasswordCheck(password); // same timing as a real check
+    await recordLogin({ userId: null, identifier, method: "PASSWORD", success: false, reason: "UNKNOWN" });
+    back(path, { error: LOGIN_FAILED });
+  }
+  const u = user!;
+  const locked = lockedFor(u);
+  if (locked) {
+    await recordLogin({ userId: u.id, identifier, method: "PASSWORD", success: false, reason: "LOCKED" });
+    back(path, { error: `Too many failed attempts. Try again in ${locked} minute${locked === 1 ? "" : "s"}, or reset your password.` });
+  }
+  if (!(await verifyPassword(password, u.passwordHash))) {
+    const mins = await registerFailure(u.id);
+    await recordLogin({ userId: u.id, identifier, method: "PASSWORD", success: false, reason: "BAD_PASSWORD" });
+    back(path, { error: mins ? `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}, or reset your password.` : LOGIN_FAILED });
+  }
+  if (["SUSPENDED", "CLOSED"].includes(u.accountStatus)) {
+    await recordLogin({ userId: u.id, identifier, method: "PASSWORD", success: false, reason: "BLOCKED" });
+    back(path, { error: `This account is ${u.accountStatus.toLowerCase()}. Contact support.` });
+  }
+  await registerSuccess(u.id);
+  await createSession(u.id, { persistent: remember, method: "PASSWORD" });
+  const ev = await recordLogin({ userId: u.id, identifier, method: "PASSWORD", success: true });
+  await audit(u.id, "LOGIN", "User", u.id, { ip, method: "PASSWORD" });
+  await loginAlert(u, { method: "PASSWORD", ...ev });
+  redirect(landing(u, next));
 }
 
 export async function logoutAction() {

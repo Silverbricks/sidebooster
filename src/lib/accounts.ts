@@ -52,7 +52,7 @@ export async function sendMobileOtp(userId: string) {
     where: { id: userId },
     data: { mobileOtpHash: sha256(`${userId}:${code}`), mobileOtpExpires: new Date(Date.now() + 10 * 60_000), mobileOtpTries: 0 },
   });
-  await sendSms(u.mobile, `Your ${brand.name} verification code is ${code}. It expires in 10 minutes.`);
+  await sendSms(u.mobile, `Your ${brand.name} verification code is ${code}. It expires in 10 minutes.`, db, { sensitive: true });
 }
 
 export async function verifyMobileOtp(userId: string, code: string) {

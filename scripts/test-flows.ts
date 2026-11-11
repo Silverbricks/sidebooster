@@ -22,6 +22,9 @@ import { socialUrlProblem } from "../src/lib/social";
 import { storeSlugProblem } from "../src/lib/urls";
 import { isAiSource, referralFromParams } from "../src/lib/referrals";
 import { backfillPublicUrls } from "../prisma/backfill-urls";
+import { checkCode, consumeLink, decoyId, findByIdentifier, issueCode, issueLink, lockMinutes, maskEmail, MAX_CODE_ATTEMPTS, peekLink, resendCode, usernameProblem } from "../src/lib/auth-codes";
+import { redactSecrets } from "../src/lib/notify";
+import { approveRecovery, rejectRecovery, setUsername, RecoveryError } from "../src/lib/recovery";
 
 let passed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -361,6 +364,103 @@ async function main() {
     assert.equal(await db.sellerProfile.count({ where: { storeSlug: null } }), 0);
     const again = await backfillPublicUrls(db);
     assert.deepEqual(again, { listings: 0, stores: 0 });
+  });
+
+  console.log("Sign-in & account recovery");
+  await test("email codes: correct code works once, then never again", async () => {
+    const c = await issueCode({ userId: buyer.id, purpose: "LOGIN", channel: "EMAIL", target: buyer.email });
+    const wrong = c.code === "000000" ? "111111" : "000000";
+    assert.equal((await checkCode(c.id, wrong, "LOGIN")).ok, false);
+    assert.equal((await checkCode(c.id, c.code, "RESET")).ok, false, "a code only works for its own purpose");
+    assert.equal((await checkCode(c.id, c.code, "LOGIN")).ok, true);
+    assert.equal((await checkCode(c.id, c.code, "LOGIN")).ok, false, "single use");
+  });
+  await test("email codes: a new code invalidates the previous one", async () => {
+    const first = await issueCode({ userId: buyer.id, purpose: "RESET", channel: "EMAIL", target: buyer.email });
+    const second = await issueCode({ userId: buyer.id, purpose: "RESET", channel: "EMAIL", target: buyer.email });
+    assert.equal((await checkCode(first.id, first.code, "RESET")).ok, false);
+    assert.equal((await checkCode(second.id, second.code, "RESET")).ok, true);
+  });
+  await test("email codes: max 5 wrong attempts, then even the right code is refused", async () => {
+    const c = await issueCode({ userId: buyer.id, purpose: "USERNAME", channel: "EMAIL", target: buyer.email });
+    const wrong = c.code === "000000" ? "111111" : "000000";
+    for (let i = 0; i < MAX_CODE_ATTEMPTS; i++) assert.equal((await checkCode(c.id, wrong, "USERNAME")).ok, false);
+    const r = await checkCode(c.id, c.code, "USERNAME");
+    assert.equal(r.ok, false);
+    assert.match((r as { error: string }).error, /Too many incorrect attempts/);
+  });
+  await test("email codes: expired codes are rejected", async () => {
+    const c = await issueCode({ userId: buyer.id, purpose: "LOGIN", channel: "EMAIL", target: buyer.email });
+    await db.authCode.update({ where: { id: c.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await checkCode(c.id, c.code, "LOGIN")).ok, false);
+  });
+  await test("email codes: 60-second resend cooldown; resend replaces the code", async () => {
+    const c = await issueCode({ userId: buyer.id, purpose: "LOGIN", channel: "EMAIL", target: buyer.email });
+    const early = await resendCode(c.id, "LOGIN");
+    assert.equal(early.ok, false);
+    assert.match((early as { error: string }).error, /wait \d+ seconds/);
+    await db.authCode.update({ where: { id: c.id }, data: { lastSentAt: new Date(Date.now() - 61_000) } });
+    const r = await resendCode(c.id, "LOGIN");
+    assert.equal(r.ok, true);
+    assert.equal((await checkCode(c.id, c.code, "LOGIN")).ok, false, "old code stops working after a resend");
+    assert.equal((await checkCode(c.id, (r as { code: string }).code, "LOGIN")).ok, true);
+  });
+  await test("codes are stored only as hashes", async () => {
+    const c = await issueCode({ userId: buyer.id, purpose: "LOGIN", channel: "EMAIL", target: buyer.email });
+    const row = await db.authCode.findUniqueOrThrow({ where: { id: c.id } });
+    assert.ok(!JSON.stringify(row).includes(c.code));
+  });
+  await test("unknown accounts get a decoy challenge that can never verify (no account enumeration)", async () => {
+    const id = decoyId();
+    assert.equal((await checkCode(id, "123456", "LOGIN")).ok, false);
+    assert.equal((await resendCode(id, "LOGIN")).ok, false);
+  });
+  await test("reset links: single use and expire", async () => {
+    const token = await issueLink({ userId: buyer.id, purpose: "RESET_LINK", target: buyer.email });
+    assert.ok(await peekLink(token, "RESET_LINK"));
+    assert.equal(await peekLink(token, "EMAIL_CHANGE_LINK"), null);
+    assert.ok(await consumeLink(token, "RESET_LINK"));
+    assert.equal(await consumeLink(token, "RESET_LINK"), null);
+    const t2 = await issueLink({ userId: buyer.id, purpose: "RESET_LINK", target: buyer.email, ttlMs: -1 });
+    assert.equal(await peekLink(t2, "RESET_LINK"), null);
+  });
+  await test("progressive lockout: 5 failures lock for 1 min, doubling to a 60-minute cap", async () => {
+    assert.deepEqual([4, 5, 6, 7, 10, 11, 20].map(lockMinutes), [0, 1, 2, 4, 32, 60, 60]);
+  });
+  await test("usernames: validated, case-insensitive sign-in, unique", async () => {
+    assert.equal(usernameProblem("ab"), "Usernames must be 3–30 characters.");
+    assert.ok(usernameProblem("admin"));
+    assert.ok(usernameProblem("BUY-000001"));
+    assert.ok(usernameProblem("9lives"));
+    assert.equal(usernameProblem("Bob.Buys"), null);
+    await setUsername(buyer.id, "Bob.Buys", buyer.id);
+    assert.equal((await findByIdentifier("BOB.buys"))?.id, buyer.id);
+    assert.equal((await findByIdentifier(buyer.email.toUpperCase()))?.id, buyer.id);
+    assert.equal(await findByIdentifier(buyer.publicId), null, "account IDs are for recovery only");
+    assert.equal((await findByIdentifier(buyer.publicId, { allowAccountId: true }))?.id, buyer.id);
+    await assert.rejects(setUsername(buyer2.id, "bob.buys", buyer2.id), RecoveryError);
+  });
+  await test("masking and log redaction", async () => {
+    assert.equal(maskEmail("darshan@gmail.com"), "d******@gmail.com");
+    const red = redactSecrets("Your code is: 482913\nReset: https://x.test/reset-password?token=abcDEF_123 thanks");
+    assert.ok(!red.includes("482913") && !red.includes("abcDEF_123"));
+  });
+  await test("lost-email recovery: admin approval changes email and signs out everywhere; a note is required", async () => {
+    const reqRow = await db.recoveryRequest.create({ data: { reference: "REC-TEST01", kind: "MOBILE_VERIFIED", userId: buyer2.id, identifier: "verified mobile", newEmail: "alice.new@example.com", newEmailVerified: true, mobileVerified: true } });
+    await db.session.create({ data: { tokenHash: crypto.randomUUID(), userId: buyer2.id, expiresAt: new Date(Date.now() + 3600_000) } });
+    await assert.rejects(approveRecovery(reqRow.id, admin.id, ""), RecoveryError);
+    await approveRecovery(reqRow.id, admin.id, "Confirmed recent order numbers by phone");
+    const after = await db.user.findUniqueOrThrow({ where: { id: buyer2.id } });
+    assert.equal(after.email, "alice.new@example.com");
+    assert.equal(await db.session.count({ where: { userId: buyer2.id } }), 0);
+    assert.equal((await db.recoveryRequest.findUniqueOrThrow({ where: { id: reqRow.id } })).status, "APPROVED");
+    await assert.rejects(rejectRecovery(reqRow.id, admin.id, "late"), RecoveryError, "cannot be decided twice");
+    await db.user.update({ where: { id: buyer2.id }, data: { email: "buyer2@sidebooster.test" } });
+  });
+  await test("audit log is append-only at the database level", async () => {
+    const row = await db.auditLog.findFirstOrThrow();
+    await assert.rejects(db.auditLog.update({ where: { id: row.id }, data: { action: "TAMPERED" } }));
+    await assert.rejects(db.auditLog.delete({ where: { id: row.id } }));
   });
 
   console.log(`\n${passed} checks passed.`);

@@ -18,7 +18,9 @@ const nextConfig: NextConfig = {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
     return [
       { source: "/:path*", headers: securityHeaders },
-      ...["/admin/:path*", "/seller/:path*", "/account/:path*", "/checkout/:path*", "/pay/:path*", "/verify", "/verify-email", "/login", "/api/:path*", "/go/:path*"].map((source) => ({ source, headers: noindex })),
+      // reset / email-change pages carry a secret token in the URL: never leak it via Referer, never cache
+      ...["/reset-password", "/verify-email-change"].map((source) => ({ source, headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }] })),
+      ...["/admin/:path*", "/seller/:path*", "/account/:path*", "/checkout/:path*", "/pay/:path*", "/verify", "/verify-email", "/login", "/login/:path*", "/api/:path*", "/go/:path*", "/forgot-password", "/forgot-username", "/forgot-email", "/reset-password", "/verify-email-change"].map((source) => ({ source, headers: noindex })),
     ];
   },
 };

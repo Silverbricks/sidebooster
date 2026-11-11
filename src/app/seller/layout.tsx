@@ -35,6 +35,7 @@ export default async function SellerLayout({ children }: { children: React.React
         { href: "/seller/campaigns/new", label: "+ Request campaign" },
         { heading: "" },
         { href: "/seller/profile", label: "Profile & settings" },
+        { href: "/account/security", label: "Security & sign-in" },
         { href: "/account", label: "→ Buyer account" },
       ]}
     >

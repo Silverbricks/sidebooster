@@ -19,9 +19,11 @@ async function main() {
     "drawAuditLog", "drawResult", "drawSchedule", "ticket", "payment", "refund", "ticketPurchase", "campaignImage", "campaign",
     "offerUsage", "offer", "payout", "commissionInvoice", "commissionRecord", "sale", "orderItem", "order", "enquiry", "wishlistItem",
     "listingAttribute", "listingImage", "listing", "commissionRule", "categoryAttribute", "sellerDocument", "paymentAccount", "sellerProfile",
-    "notification", "auditLog", "session", "user", "category", "counter", "setting", "page", "banner", "messageLog", "webhookEvent", "contactMessage",
+    "notification", "authCode", "loginEvent", "recoveryRequest", "session", "user", "category", "counter", "setting", "page", "banner", "messageLog", "webhookEvent", "contactMessage",
   ] as const;
   // refund references payment → delete refunds first
+  // AuditLog is append-only (DB trigger blocks DELETE) — a dev reseed truncates it instead.
+  await db.$executeRawUnsafe('TRUNCATE "AuditLog"');
   await db.refund.deleteMany();
   for (const t of tables) await (db[t] as unknown as { deleteMany: () => Promise<unknown> }).deleteMany();
 

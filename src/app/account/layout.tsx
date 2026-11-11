@@ -25,6 +25,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
         { href: "/account/draws", label: "Draws & winnings" },
         { heading: "" },
         { href: "/account/notifications", label: "Notifications", badge: unread },
+        { href: "/account/security", label: "Security & sign-in" },
         ...(user.sellerProfile ? [{ href: "/seller", label: "→ Seller dashboard" }] : [{ href: "/register/seller", label: "Become a seller" }]),
       ]}
     >
